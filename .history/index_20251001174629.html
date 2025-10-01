@@ -20,18 +20,18 @@
     // === Animation Configuration ===
     const CONFIG = {
       // Ball settings
-      BALL_COUNT: 35,
-      BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
+      BALL_COUNT: 50,
+      BALL_SIZE_MULTIPLIER: 0.5, // Multiplier for ball sizes (1.0 = original)
       
       // Animation timing
       BALL_APPEAR_DELAY: 140, // ms between ball appearances
       FINAL_SETTLEMENT_TIME: 4000, // ms for final settlement phase
       
       // Force simulation parameters
-      CHARGE_STRENGTH: -10, // Repulsion between balls
-      PACK_FORCE_STRENGTH: 0.2, // Strength of pack force (0.1-0.5)
-      COLLISION_PADDING: 0.1, // Extra padding around balls for collision
-      ALPHA_DECAY: 0.02, // How fast simulation slows down
+      CHARGE_STRENGTH: -50, // Repulsion between balls
+      PACK_FORCE_STRENGTH: 0.5, // Strength of pack force (0.1-0.5)
+      COLLISION_PADDING: 0.00001, // Extra padding around balls for collision
+      ALPHA_DECAY: 0.00002, // How fast simulation slows down
       
       // Visual settings
       STROKE_WIDTH: 2,
@@ -53,7 +53,7 @@
       
       // Ball sizing and spacing
       FIXED_BALL_RADIUS: 15, // Fixed radius for all balls
-      BALL_PADDING: 10 // Padding between balls
+      BALL_PADDING: 0.1 // Padding between balls
     };
 
     // === Generate circles with proper circle packing and spacing control ===

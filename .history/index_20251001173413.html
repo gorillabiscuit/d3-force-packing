@@ -20,18 +20,18 @@
     // === Animation Configuration ===
     const CONFIG = {
       // Ball settings
-      BALL_COUNT: 35,
-      BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
+      BALL_COUNT: 50,
+      BALL_SIZE_MULTIPLIER: 0.5, // Multiplier for ball sizes (1.0 = original)
       
       // Animation timing
       BALL_APPEAR_DELAY: 140, // ms between ball appearances
       FINAL_SETTLEMENT_TIME: 4000, // ms for final settlement phase
       
       // Force simulation parameters
-      CHARGE_STRENGTH: -10, // Repulsion between balls
-      PACK_FORCE_STRENGTH: 0.2, // Strength of pack force (0.1-0.5)
-      COLLISION_PADDING: 0.1, // Extra padding around balls for collision
-      ALPHA_DECAY: 0.02, // How fast simulation slows down
+      CHARGE_STRENGTH: -50, // Repulsion between balls
+      PACK_FORCE_STRENGTH: 0.5, // Strength of pack force (0.1-0.5)
+      COLLISION_PADDING: 0.00001, // Extra padding around balls for collision
+      ALPHA_DECAY: 0.00002, // How fast simulation slows down
       
       // Visual settings
       STROKE_WIDTH: 2,
@@ -53,49 +53,28 @@
       
       // Ball sizing and spacing
       FIXED_BALL_RADIUS: 15, // Fixed radius for all balls
-      BALL_PADDING: 10 // Padding between balls
+      BALL_PADDING:3 // Padding between balls
     };
 
-    // === Generate circles with proper circle packing and spacing control ===
+    // === Generate packed circles with proper padding control ===
     // Create data with random values for different ball sizes
     const data = { children: Array.from({ length: CONFIG.BALL_COUNT }, () => ({ value: Math.random() })) };
 
-    // Use D3's pack algorithm to get the basic circular layout
+    // Pack with the desired padding - this creates actual gaps between balls
     const pack = d3.pack()
-      .size([CONFIG.CANVAS_SIZE * 0.8, CONFIG.CANVAS_SIZE * 0.8])
-      .padding(0); // No padding in pack algorithm
+      .size([CONFIG.CANVAS_SIZE, CONFIG.CANVAS_SIZE])
+      .padding(CONFIG.BALL_PADDING);
 
     const root = d3.hierarchy(data).sum(d => d.value);
-    const packedNodes = pack(root).leaves();
+    const nodes = pack(root).leaves();
     
     // Apply size multiplier to control overall ball sizes
-    packedNodes.forEach(node => {
+    nodes.forEach(node => {
       node.r *= CONFIG.BALL_SIZE_MULTIPLIER;
     });
     
-    // Center the packed circles in the canvas
-    const bounds = d3.extent(packedNodes, d => d.x - d.r);
-    const boundsY = d3.extent(packedNodes, d => d.y - d.r);
-    const minX = bounds[0];
-    const minY = boundsY[0];
-    const maxX = d3.extent(packedNodes, d => d.x + d.r)[1];
-    const maxY = d3.extent(packedNodes, d => d.y + d.r)[1];
-    
-    const layoutWidth = maxX - minX;
-    const layoutHeight = maxY - minY;
-    const offsetX = (CONFIG.CANVAS_SIZE - layoutWidth) / 2 - minX;
-    const offsetY = (CONFIG.CANVAS_SIZE - layoutHeight) / 2 - minY;
-    
-    // Create final nodes with target positions
-    const nodes = packedNodes.map(node => ({
-      ...node,
-      x: node.x + offsetX,
-      y: node.y + offsetY,
-      targetX: node.x + offsetX,
-      targetY: node.y + offsetY,
-      vx: 0,
-      vy: 0
-    }));
+    // The balls are already properly spaced by D3's pack algorithm
+    // No need for manual centering as D3 handles it
 
     const svg = d3.select("#viz");
 
@@ -108,13 +87,12 @@
     let lastFrameTime = 0;
     let animationId = null;
 
-
     // === Force simulation setup ===
     function createSimulation(nodes) {
       return d3.forceSimulation(nodes)
         .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH))
         .force("center", d3.forceCenter(CONFIG.CENTER_X, CONFIG.CENTER_Y))
-        .force("collision", d3.forceCollide().radius(d => d.r + CONFIG.BALL_PADDING))
+        .force("collision", d3.forceCollide().radius(d => d.r + CONFIG.COLLISION_PADDING))
         .force("pack", packForce(nodes))
         .alphaDecay(CONFIG.ALPHA_DECAY) // Slower decay for more settling time
         .on("tick", updateVisualization)
