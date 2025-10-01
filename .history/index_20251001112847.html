@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Circle Packing Export</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 2rem; }
+    #viz { border: 1px solid #ccc; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Circle Packing with Export</h1>
+  <svg id="viz" width="900" height="900"></svg>
+  <br>
+  <button id="downloadBtn">Download SVG</button>
+
+  <script>
+    // === Generate packed circles ===
+    const data = { children: Array.from({ length: 80 }, () => ({ value: Math.random() })) };
+
+    const pack = d3.pack()
+      .size([900, 900])
+      .padding(4);
+
+    const root = d3.hierarchy(data).sum(d => d.value);
+    const nodes = pack(root).leaves();
+
+    const svg = d3.select("#viz");
+
+    // === Draw connecting lines between all circles ===
+    for (let i = 0; i < nodes.length; i++) {
+      for (let j = i + 1; j < nodes.length; j++) {
+        svg.append("line")
+          .attr("x1", nodes[i].x)
+          .attr("y1", nodes[i].y)
+          .attr("x2", nodes[j].x)
+          .attr("y2", nodes[j].y)
+          .attr("stroke", "#0A61B5")
+          .attr("stroke-width", 0.5)
+          .attr("opacity", 0.3);
+      }
+    }
+
+    // === Draw circles on top of lines ===
+    svg.selectAll("circle")
+      .data(nodes)
+      .enter()
+      .append("circle")
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", d => d.r)
+      .attr("fill", "none")
+      .attr("stroke", d => d3.interpolateCool(Math.random()))
+      .attr("stroke-width", 2);
+
+    // === Download logic ===
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      const serializer = new XMLSerializer();
+      const svgNode = document.getElementById("viz");
+      const source = serializer.serializeToString(svgNode);
+
+      const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "circle-packing.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>

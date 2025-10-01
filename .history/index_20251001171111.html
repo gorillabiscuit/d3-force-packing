@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Circle Packing Export</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 2rem; }
+    #viz { border: 1px solid #ccc; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Circle Packing with Export</h1>
+  <svg id="viz" width="900" height="900"></svg>
+  <br>
+  <button id="downloadBtn">Download SVG</button>
+
+  <script>
+    // === Generate packed circles ===
+    const data = { children: Array.from({ length: 40 }, () => ({ value: Math.random() })) };
+
+    const pack = d3.pack()
+      .size([900, 900])
+      .padding(4);
+
+    const root = d3.hierarchy(data).sum(d => d.value);
+    const nodes = pack(root).leaves();
+
+    const svg = d3.select("#viz");
+
+    // === Animation variables ===
+    let currentNodes = [];
+    let simulation = null;
+    let circles = null;
+    let lines = null;
+
+    // === Force simulation setup ===
+    function createSimulation(nodes) {
+      return d3.forceSimulation(nodes)
+        .force("charge", d3.forceManyBody().strength(-50))
+        .force("center", d3.forceCenter(450, 450))
+        .force("collision", d3.forceCollide().radius(d => d.r + 1))
+        .force("pack", packForce(nodes))
+        .alphaDecay(0.02) // Slower decay for more settling time
+        .on("tick", updateVisualization);
+    }
+
+    // === Custom force to move toward packed positions ===
+    function packForce(nodes) {
+      return function() {
+        nodes.forEach(node => {
+          if (node.targetX !== undefined && node.targetY !== undefined) {
+            const dx = node.targetX - node.x;
+            const dy = node.targetY - node.y;
+            node.vx += dx * 0.1;
+            node.vy += dy * 0.1;
+          }
+        });
+      };
+    }
+
+    // === Update visualization during simulation ===
+    function updateVisualization() {
+      if (circles) {
+        circles
+          .attr("cx", d => d.x)
+          .attr("cy", d => d.y);
+      }
+      if (lines) {
+        lines
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
+      }
+    }
+
+    // === Add new ball and trigger simulation ===
+    function addBall() {
+      if (currentNodes.length >= nodes.length) return;
+
+      // Add new node at center with target packed position
+      const newNode = {
+        ...nodes[currentNodes.length],
+        x: 450, // start at center
+        y: 450, // start at center
+        targetX: nodes[currentNodes.length].x, // packed position
+        targetY: nodes[currentNodes.length].y, // packed position
+        vx: 0,
+        vy: 0
+      };
+      currentNodes.push(newNode);
+
+      // Update target positions for all existing nodes to their packed positions
+      currentNodes.forEach((node, i) => {
+        node.targetX = nodes[i].x;
+        node.targetY = nodes[i].y;
+      });
+
+      // Update circles
+      circles = svg.selectAll("circle")
+        .data(currentNodes)
+        .join("circle")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", d => d.r)
+        .attr("fill", "none")
+        .attr("stroke", "#0A61B5")
+        .attr("stroke-width", 2);
+
+      // Update lines (connect new ball to all existing balls)
+      const links = [];
+      for (let i = 0; i < currentNodes.length; i++) {
+        for (let j = i + 1; j < currentNodes.length; j++) {
+          links.push({ source: currentNodes[i], target: currentNodes[j] });
+        }
+      }
+
+      lines = svg.selectAll("line")
+        .data(links)
+        .join("line")
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y)
+        .attr("stroke", "#0A61B5")
+        .attr("stroke-width", 0.5)
+        .attr("opacity", 0.3);
+
+      // Create new simulation with updated nodes
+      if (simulation) simulation.stop();
+      simulation = createSimulation(currentNodes);
+      
+      // Run simulation for a bit, then add next ball
+      simulation.alpha(1).restart();
+      
+      setTimeout(() => {
+        simulation.stop();
+        addBall();
+      }, 240); // Wait 240ms before adding next ball (70% reduction from 800ms)
+    }
+
+    // === Start the animation ===
+    addBall();
+
+    // === Download logic ===
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      const serializer = new XMLSerializer();
+      const svgNode = document.getElementById("viz");
+      const source = serializer.serializeToString(svgNode);
+
+      const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "circle-packing.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>
