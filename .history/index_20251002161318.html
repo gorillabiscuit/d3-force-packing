@@ -24,7 +24,7 @@
       BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
       
       // Animation timing
-      BALL_APPEAR_DELAY: 40, // ms between ball appearances
+      BALL_APPEAR_DELAY: 140, // ms between ball appearances
       FINAL_SETTLEMENT_TIME: 4000, // ms for final settlement phase
       
       // Force simulation parameters
@@ -58,19 +58,13 @@
       MAX_LINES: 5000, // Maximum number of lines to draw
       
       // Mouse interaction settings
-      MOUSE_REPULSION_STRENGTH: -2, // Strength of mouse repulsion force
-      MOUSE_REPULSION_DISTANCE: 25, // Distance at which mouse affects balls
-      MOUSE_TOUCH_STRENGTH: -20, // Extra strength when mouse is very close to a ball
-      MOUSE_TOUCH_DISTANCE: 15, // Distance for "touching" a ball (stronger force)
-      MOUSE_DAMPENING: 0.00001, // Dampening factor for touch strength (0-1, lower = more dampening)
-      ENABLE_MOUSE_INTERACTION: true, // Toggle mouse interaction
+      MOUSE_REPULSION_STRENGTH: -200, // Strength of mouse repulsion force
+      MOUSE_REPULSION_DISTANCE: 100, // Distance at which mouse affects balls
+      ENABLE_MOUSE_INTERACTION: true // Toggle mouse interaction
       
       // Ball sizing and spacing
       FIXED_BALL_RADIUS: 15, // Fixed radius for all balls
       BALL_PADDING: 1, // Padding between balls
-      MIN_BALL_RADIUS: 14, // Minimum ball radius
-      MAX_BALL_RADIUS: 20, // Maximum ball radius
-      USE_RANDOM_BALL_SIZES: true, // Toggle between random sizes and fixed size
       
       // Cluster settings (NEW)
       NUM_CLUSTERS: 9,
@@ -92,22 +86,11 @@
         Math.floor(Math.random() * (CONFIG.MAX_BALLS_PER_CLUSTER - CONFIG.MIN_BALLS_PER_CLUSTER + 1));
       
       // Create balls for this cluster
-      const clusterBalls = Array.from({ length: numBalls }, () => {
-        let ballValue;
-        if (CONFIG.USE_RANDOM_BALL_SIZES) {
-          // Generate random value between 0 and 1 for size variation
-          ballValue = Math.random();
-        } else {
-          // Use fixed value for consistent size
-          ballValue = 1;
-        }
-        
-        return {
-          id: ballId++,
-          value: ballValue,
-          clusterId: i
-        };
-      });
+      const clusterBalls = Array.from({ length: numBalls }, () => ({
+        id: ballId++,
+        value: Math.random(),
+        clusterId: i
+      }));
       
       clusters.push({
         id: i,
@@ -139,23 +122,7 @@
       
       // Apply size multiplier and offset to cluster center
       packedBalls.forEach(ball => {
-        // Apply size multiplier first
         ball.r *= CONFIG.BALL_SIZE_MULTIPLIER;
-        
-        // Apply min/max radius constraints if using random sizes
-        if (CONFIG.USE_RANDOM_BALL_SIZES) {
-          // Scale the radius to fit within min/max bounds
-          const minRadius = CONFIG.MIN_BALL_RADIUS;
-          const maxRadius = CONFIG.MAX_BALL_RADIUS;
-          const sizeRange = maxRadius - minRadius;
-          
-          // Map the ball's value (0-1) to the radius range
-          ball.r = minRadius + (ball.value * sizeRange);
-        } else {
-          // Use fixed radius
-          ball.r = CONFIG.FIXED_BALL_RADIUS;
-        }
-        
         ball.x += cluster.centerX;
         ball.y += cluster.centerY;
         ball.clusterId = cluster.id;
@@ -180,16 +147,11 @@
     let frameCount = 0;
     let lastFrameTime = 0;
     let animationId = null;
-    
-    // === Mouse interaction variables ===
-    let mouseX = CONFIG.CENTER_X;
-    let mouseY = CONFIG.CENTER_Y;
-    let isMouseOverCanvas = false;
 
 
     // === Force simulation setup ===
     function createSimulation(nodes) {
-      const sim = d3.forceSimulation(nodes)
+      return d3.forceSimulation(nodes)
         .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH))
         .force("center", d3.forceCenter(CONFIG.CENTER_X, CONFIG.CENTER_Y))
         .force("collision", d3.forceCollide().radius(d => d.r + CONFIG.BALL_PADDING))
@@ -197,13 +159,6 @@
         .alphaDecay(CONFIG.ALPHA_DECAY) // Slower decay for more settling time
         .on("tick", updateVisualization)
         .velocityDecay(0.4); // Add velocity decay for smoother animation
-        
-      // Add mouse repulsion force if enabled
-      if (CONFIG.ENABLE_MOUSE_INTERACTION) {
-        sim.force("mouse", mouseRepulsionForce());
-      }
-      
-      return sim;
     }
 
     // === Custom force to move toward packed positions ===
@@ -215,50 +170,6 @@
             const dy = node.targetY - node.y;
             node.vx += dx * CONFIG.PACK_FORCE_STRENGTH;
             node.vy += dy * CONFIG.PACK_FORCE_STRENGTH;
-          }
-        });
-      };
-    }
-
-    // === Mouse repulsion force ===
-    function mouseRepulsionForce() {
-      return function() {
-        if (!isMouseOverCanvas) return;
-        
-        currentNodes.forEach(node => {
-          const dx = node.x - mouseX;
-          const dy = node.y - mouseY;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-          
-          // Only apply force if within repulsion distance
-          if (distance < CONFIG.MOUSE_REPULSION_DISTANCE && distance > 0) {
-            // Calculate force strength: 0% at max distance, 100% at 0 distance
-            const normalizedDistance = distance / CONFIG.MOUSE_REPULSION_DISTANCE;
-            const forceMultiplier = 1 - normalizedDistance; // 0 at max distance, 1 at 0 distance
-            
-            let baseForce;
-            
-            // Check if mouse is "touching" the ball (very close)
-            if (distance < CONFIG.MOUSE_TOUCH_DISTANCE) {
-              // Use stronger touch force for very close interactions
-              baseForce = CONFIG.MOUSE_TOUCH_STRENGTH;
-              
-              // Apply dampening to prevent extreme forces at very close distances
-              const touchDampening = Math.pow(forceMultiplier, CONFIG.MOUSE_DAMPENING);
-              baseForce *= touchDampening;
-            } else {
-              // Use normal repulsion force for medium distance
-              baseForce = CONFIG.MOUSE_REPULSION_STRENGTH;
-            }
-            
-            // Apply linear force scaling
-            const force = baseForce * forceMultiplier;
-            
-            const fx = (dx / distance) * force;
-            const fy = (dy / distance) * force;
-            
-            node.vx += fx;
-            node.vy += fy;
           }
         });
       };
@@ -563,27 +474,6 @@
         .attr("stroke-dasharray", CONFIG.INTER_CLUSTER_LINE_DASH);
     }
 
-
-    // === Mouse event listeners ===
-    svg.on("mousemove", function(event) {
-      const rect = this.getBoundingClientRect();
-      mouseX = event.clientX - rect.left;
-      mouseY = event.clientY - rect.top;
-      isMouseOverCanvas = true;
-      
-      // Restart simulation to apply mouse force
-      if (simulation && CONFIG.ENABLE_MOUSE_INTERACTION) {
-        simulation.alpha(0.3).restart();
-      }
-    });
-    
-    svg.on("mouseleave", function() {
-      isMouseOverCanvas = false;
-    });
-    
-    svg.on("mouseenter", function() {
-      isMouseOverCanvas = true;
-    });
 
     // === Start the animation ===
     addBall();

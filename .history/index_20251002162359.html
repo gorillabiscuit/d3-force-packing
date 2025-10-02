@@ -59,17 +59,16 @@
       
       // Mouse interaction settings
       MOUSE_REPULSION_STRENGTH: -2, // Strength of mouse repulsion force
-      MOUSE_REPULSION_DISTANCE: 25, // Distance at which mouse affects balls
-      MOUSE_TOUCH_STRENGTH: -20, // Extra strength when mouse is very close to a ball
-      MOUSE_TOUCH_DISTANCE: 15, // Distance for "touching" a ball (stronger force)
-      MOUSE_DAMPENING: 0.00001, // Dampening factor for touch strength (0-1, lower = more dampening)
+      MOUSE_REPULSION_DISTANCE: 100, // Distance at which mouse affects balls
+      MOUSE_TOUCH_STRENGTH: -2, // Extra strength when mouse is very close to a ball
+      MOUSE_TOUCH_DISTANCE: 30, // Distance for "touching" a ball (stronger force)
       ENABLE_MOUSE_INTERACTION: true, // Toggle mouse interaction
       
       // Ball sizing and spacing
       FIXED_BALL_RADIUS: 15, // Fixed radius for all balls
       BALL_PADDING: 1, // Padding between balls
-      MIN_BALL_RADIUS: 14, // Minimum ball radius
-      MAX_BALL_RADIUS: 20, // Maximum ball radius
+      MIN_BALL_RADIUS: 8, // Minimum ball radius
+      MAX_BALL_RADIUS: 25, // Maximum ball radius
       USE_RANDOM_BALL_SIZES: true, // Toggle between random sizes and fixed size
       
       // Cluster settings (NEW)
@@ -242,10 +241,6 @@
             if (distance < CONFIG.MOUSE_TOUCH_DISTANCE) {
               // Use stronger touch force for very close interactions
               baseForce = CONFIG.MOUSE_TOUCH_STRENGTH;
-              
-              // Apply dampening to prevent extreme forces at very close distances
-              const touchDampening = Math.pow(forceMultiplier, CONFIG.MOUSE_DAMPENING);
-              baseForce *= touchDampening;
             } else {
               // Use normal repulsion force for medium distance
               baseForce = CONFIG.MOUSE_REPULSION_STRENGTH;
