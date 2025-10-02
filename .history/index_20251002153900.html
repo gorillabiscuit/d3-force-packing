@@ -40,12 +40,6 @@
       STROKE_COLOR: "#0A61B5",
       LINE_COLOR: "#0A61B5",
       
-      // Inter-cluster line settings
-      INTER_CLUSTER_LINE_WIDTH: 1.5,
-      INTER_CLUSTER_LINE_OPACITY: 0.6,
-      INTER_CLUSTER_LINE_COLOR: "#4885CA",
-      INTER_CLUSTER_LINE_DASH: "1,2", // Dashed line pattern
-      
       // Canvas settings
       CANVAS_SIZE: 700,
       CENTER_X: 350, // Updated for 700px canvas
@@ -59,78 +53,82 @@
       
       // Ball sizing and spacing
       FIXED_BALL_RADIUS: 15, // Fixed radius for all balls
-      BALL_PADDING: 1, // Padding between balls
+      BALL_PADDING: 10, // Padding between balls
       
-      // Cluster settings (NEW)
-      NUM_CLUSTERS: 9,
-      MIN_BALLS_PER_CLUSTER: 7,
-      MAX_BALLS_PER_CLUSTER: 12,
-      CLUSTER_RADIUS: 200, // Distance from center for cluster centers
-      CLUSTER_PACK_SIZE: 120 // Size for individual cluster packing
+      // Cluster settings
+      NUM_CLUSTERS: 6, // Number of clusters
+      CLUSTER_RADIUS: 0.25, // Distance from center (as fraction of canvas size)
+      CLUSTER_SIZE: 120, // Size of each cluster's packing area
+      CLUSTER_FORCE_STRENGTH: 0.1 // Strength of cluster attraction force
     };
 
-    // === Generate six clusters in radial layout ===
+    // === Generate clusters in radial pattern ===
+    const NUM_CLUSTERS = CONFIG.NUM_CLUSTERS;
+    const CLUSTER_RADIUS = CONFIG.CANVAS_SIZE * CONFIG.CLUSTER_RADIUS; // Distance from center to cluster centers
     
-    // Step 1: Create cluster data structure
-    const clusters = [];
-    let ballId = 0;
-    
-    for (let i = 0; i < CONFIG.NUM_CLUSTERS; i++) {
-      // Random number of balls per cluster (7-12)
-      const numBalls = CONFIG.MIN_BALLS_PER_CLUSTER + 
-        Math.floor(Math.random() * (CONFIG.MAX_BALLS_PER_CLUSTER - CONFIG.MIN_BALLS_PER_CLUSTER + 1));
-      
-      // Create balls for this cluster
-      const clusterBalls = Array.from({ length: numBalls }, () => ({
-        id: ballId++,
-        value: Math.random(),
-        clusterId: i
-      }));
-      
-      clusters.push({
-        id: i,
-        balls: clusterBalls,
-        centerX: 0, // Will be calculated
-        centerY: 0  // Will be calculated
-      });
-    }
-    
-    // Step 2: Calculate radial positions for cluster centers
-    clusters.forEach((cluster, i) => {
-      const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
-      cluster.centerX = CONFIG.CENTER_X + CONFIG.CLUSTER_RADIUS * Math.cos(angle);
-      cluster.centerY = CONFIG.CENTER_Y + CONFIG.CLUSTER_RADIUS * Math.sin(angle);
+    // Create data with random values for different ball sizes
+    const allBalls = Array.from({ length: CONFIG.BALL_COUNT }, (_, i) => ({
+      id: i,
+      value: Math.random(),
+      r: 0, // Will be calculated
+      x: CONFIG.CENTER_X, // Start at center
+      y: CONFIG.CENTER_Y, // Start at center
+      vx: 0,
+      vy: 0,
+      clusterId: i % NUM_CLUSTERS, // Assign to clusters in round-robin
+      targetX: CONFIG.CENTER_X,
+      targetY: CONFIG.CENTER_Y
+    }));
+
+    // Calculate target radii based on values
+    const maxValue = Math.max(...allBalls.map(d => d.value));
+    const minRadius = 8;
+    const maxRadius = 25;
+    allBalls.forEach(d => {
+      d.r = minRadius + (d.value / maxValue) * (maxRadius - minRadius);
+      d.r *= CONFIG.BALL_SIZE_MULTIPLIER;
     });
-    
-    // Step 3: Pack each cluster individually
-    const allNodes = [];
-    
+
+    // Create cluster data structure
+    const clusters = Array.from({ length: NUM_CLUSTERS }, (_, i) => {
+      const angle = (i * 2 * Math.PI) / NUM_CLUSTERS;
+      const centerX = CONFIG.CENTER_X + CLUSTER_RADIUS * Math.cos(angle);
+      const centerY = CONFIG.CENTER_Y + CLUSTER_RADIUS * Math.sin(angle);
+      
+      return {
+        id: i,
+        centerX: centerX,
+        centerY: centerY,
+        targetX: centerX,
+        targetY: centerY,
+        balls: allBalls.filter(ball => ball.clusterId === i)
+      };
+    });
+
+    // Pack each cluster independently
+    const clusterSize = CONFIG.CLUSTER_SIZE; // Size for each cluster's packing area
     clusters.forEach(cluster => {
-      // Create hierarchy for this cluster
-      const clusterData = { children: cluster.balls };
+      if (cluster.balls.length === 0) return;
+      
       const pack = d3.pack()
-        .size([CONFIG.CLUSTER_PACK_SIZE, CONFIG.CLUSTER_PACK_SIZE])
+        .size([clusterSize, clusterSize])
         .padding(CONFIG.BALL_PADDING);
       
-      const root = d3.hierarchy(clusterData).sum(d => d.value);
+      const data = { children: cluster.balls.map(ball => ({ value: ball.value })) };
+      const root = d3.hierarchy(data).sum(d => d.value);
       const packedBalls = pack(root).leaves();
       
-      // Apply size multiplier and offset to cluster center
-      packedBalls.forEach(ball => {
-        ball.r *= CONFIG.BALL_SIZE_MULTIPLIER;
-        ball.x += cluster.centerX;
-        ball.y += cluster.centerY;
-        ball.clusterId = cluster.id;
-        ball.targetX = ball.x;
-        ball.targetY = ball.y;
-        ball.vx = 0;
-        ball.vy = 0;
+      // Update ball positions relative to cluster center
+      packedBalls.forEach((packedBall, i) => {
+        if (cluster.balls[i]) {
+          cluster.balls[i].targetX = cluster.centerX + packedBall.x - clusterSize/2;
+          cluster.balls[i].targetY = cluster.centerY + packedBall.y - clusterSize/2;
+        }
       });
-      
-      allNodes.push(...packedBalls);
     });
-    
-    const nodes = allNodes;
+
+    // Create final nodes array (flattened from clusters)
+    const nodes = allBalls;
 
     const svg = d3.select("#viz");
 
@@ -150,10 +148,32 @@
         .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH))
         .force("center", d3.forceCenter(CONFIG.CENTER_X, CONFIG.CENTER_Y))
         .force("collision", d3.forceCollide().radius(d => d.r + CONFIG.BALL_PADDING))
+        .force("cluster", clusterForce())
         .force("pack", packForce(nodes))
         .alphaDecay(CONFIG.ALPHA_DECAY) // Slower decay for more settling time
         .on("tick", updateVisualization)
         .velocityDecay(0.4); // Add velocity decay for smoother animation
+    }
+
+    // === Cluster attraction force ===
+    function clusterForce() {
+      return function(nodes) {
+        nodes.forEach(node => {
+          if (node.clusterId !== undefined) {
+            const cluster = clusters[node.clusterId];
+            if (cluster) {
+              const dx = cluster.centerX - node.x;
+              const dy = cluster.centerY - node.y;
+              const distance = Math.sqrt(dx * dx + dy * dy);
+              if (distance > 0) {
+                const force = 0.1 * distance; // Attraction strength
+                node.vx += (dx / distance) * force;
+                node.vy += (dy / distance) * force;
+              }
+            }
+          }
+        });
+      };
     }
 
     // === Custom force to move toward packed positions ===
@@ -200,9 +220,6 @@
           .attr("x2", d => d.target.x)
           .attr("y2", d => d.target.y);
       }
-      
-      // Update inter-cluster lines during animation
-      updateInterClusterConnections();
     }
 
     // === Add new ball and trigger simulation ===
@@ -242,11 +259,11 @@
         .attr("stroke", CONFIG.STROKE_COLOR)
         .attr("stroke-width", CONFIG.STROKE_WIDTH);
 
-      // Update lines only within each cluster
+      // Update lines (connect balls within the same cluster) - only if enabled
       if (CONFIG.ENABLE_LINES) {
         const links = [];
         
-        // Group nodes by cluster
+        // Group current nodes by cluster
         const nodesByCluster = {};
         currentNodes.forEach(node => {
           if (!nodesByCluster[node.clusterId]) {
@@ -255,14 +272,11 @@
           nodesByCluster[node.clusterId].push(node);
         });
         
-        // Create links only within each cluster
+        // Create links within each cluster
         Object.values(nodesByCluster).forEach(clusterNodes => {
           for (let i = 0; i < clusterNodes.length; i++) {
             for (let j = i + 1; j < clusterNodes.length; j++) {
-              links.push({ 
-                source: clusterNodes[i], 
-                target: clusterNodes[j] 
-              });
+              links.push({ source: clusterNodes[i], target: clusterNodes[j] });
             }
           }
         });
@@ -279,9 +293,6 @@
           .attr("opacity", CONFIG.LINE_OPACITY);
       }
 
-      // Update inter-cluster connections
-      updateInterClusterConnections();
-
       // Create new simulation with updated nodes
       if (simulation) simulation.stop();
       simulation = createSimulation(currentNodes);
@@ -293,54 +304,6 @@
         simulation.stop();
         addBall();
       }, CONFIG.BALL_APPEAR_DELAY);
-    }
-
-    // === Update inter-cluster connections during animation ===
-    function updateInterClusterConnections() {
-      const interClusterLinks = [];
-      
-      // Calculate cluster centers (average position of balls in each cluster)
-      const clusterCenters = {};
-      const nodesByCluster = {};
-      
-      currentNodes.forEach(node => {
-        if (!nodesByCluster[node.clusterId]) {
-          nodesByCluster[node.clusterId] = [];
-        }
-        nodesByCluster[node.clusterId].push(node);
-      });
-      
-      // Calculate center for each cluster
-      Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
-        const centerX = d3.mean(clusterNodes, d => d.x);
-        const centerY = d3.mean(clusterNodes, d => d.y);
-        clusterCenters[clusterId] = { x: centerX, y: centerY };
-      });
-      
-      // Create links between all cluster centers
-      const clusterIds = Object.keys(clusterCenters);
-      for (let i = 0; i < clusterIds.length; i++) {
-        for (let j = i + 1; j < clusterIds.length; j++) {
-          interClusterLinks.push({
-            source: clusterCenters[clusterIds[i]],
-            target: clusterCenters[clusterIds[j]]
-          });
-        }
-      }
-      
-      // Update inter-cluster lines
-      svg.selectAll("line.inter-cluster")
-        .data(interClusterLinks)
-        .join("line")
-        .attr("class", "inter-cluster")
-        .attr("x1", d => d.source.x)
-        .attr("y1", d => d.source.y)
-        .attr("x2", d => d.target.x)
-        .attr("y2", d => d.target.y)
-        .attr("stroke", CONFIG.INTER_CLUSTER_LINE_COLOR)
-        .attr("stroke-width", CONFIG.INTER_CLUSTER_LINE_WIDTH)
-        .attr("opacity", CONFIG.INTER_CLUSTER_LINE_OPACITY)
-        .attr("stroke-dasharray", CONFIG.INTER_CLUSTER_LINE_DASH);
     }
 
     // === Final settlement phase ===
@@ -367,113 +330,11 @@
       console.log(`FPS: ${fps}, Balls: ${currentNodes.length}, Lines: ${lines ? lines.size() : 0}`);
     }
 
-    // === Static rendering (no animation) ===
-    function renderStaticClusters() {
-      // Render all circles
-      circles = svg.selectAll("circle")
-        .data(nodes)
-        .join("circle")
-        .attr("cx", d => d.x)
-        .attr("cy", d => d.y)
-        .attr("r", d => d.r)
-        .attr("fill", "none")
-        .attr("stroke", CONFIG.STROKE_COLOR)
-        .attr("stroke-width", CONFIG.STROKE_WIDTH);
-
-      // Render lines only within each cluster
-      if (CONFIG.ENABLE_LINES) {
-        const links = [];
-        
-        // Group nodes by cluster
-        const nodesByCluster = {};
-        nodes.forEach(node => {
-          if (!nodesByCluster[node.clusterId]) {
-            nodesByCluster[node.clusterId] = [];
-          }
-          nodesByCluster[node.clusterId].push(node);
-        });
-        
-        // Create links only within each cluster
-        Object.values(nodesByCluster).forEach(clusterNodes => {
-          for (let i = 0; i < clusterNodes.length; i++) {
-            for (let j = i + 1; j < clusterNodes.length; j++) {
-              links.push({ 
-                source: clusterNodes[i], 
-                target: clusterNodes[j] 
-              });
-            }
-          }
-        });
-
-        lines = svg.selectAll("line")
-          .data(links)
-          .join("line")
-          .attr("x1", d => d.source.x)
-          .attr("y1", d => d.source.y)
-          .attr("x2", d => d.target.x)
-          .attr("y2", d => d.target.y)
-          .attr("stroke", CONFIG.LINE_COLOR)
-          .attr("stroke-width", CONFIG.LINE_WIDTH)
-          .attr("opacity", CONFIG.LINE_OPACITY);
-      }
-
-      // Render inter-cluster connections
-      renderInterClusterConnections();
-    }
-
-    // === Render connections between clusters ===
-    function renderInterClusterConnections() {
-      const interClusterLinks = [];
-      
-      // Calculate cluster centers (average position of balls in each cluster)
-      const clusterCenters = {};
-      const nodesByCluster = {};
-      
-      nodes.forEach(node => {
-        if (!nodesByCluster[node.clusterId]) {
-          nodesByCluster[node.clusterId] = [];
-        }
-        nodesByCluster[node.clusterId].push(node);
-      });
-      
-      // Calculate center for each cluster
-      Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
-        const centerX = d3.mean(clusterNodes, d => d.x);
-        const centerY = d3.mean(clusterNodes, d => d.y);
-        clusterCenters[clusterId] = { x: centerX, y: centerY };
-      });
-      
-      // Create links between all cluster centers
-      const clusterIds = Object.keys(clusterCenters);
-      for (let i = 0; i < clusterIds.length; i++) {
-        for (let j = i + 1; j < clusterIds.length; j++) {
-          interClusterLinks.push({
-            source: clusterCenters[clusterIds[i]],
-            target: clusterCenters[clusterIds[j]]
-          });
-        }
-      }
-      
-      // Render inter-cluster lines
-      svg.selectAll("line.inter-cluster")
-        .data(interClusterLinks)
-        .join("line")
-        .attr("class", "inter-cluster")
-        .attr("x1", d => d.source.x)
-        .attr("y1", d => d.source.y)
-        .attr("x2", d => d.target.x)
-        .attr("y2", d => d.target.y)
-        .attr("stroke", CONFIG.INTER_CLUSTER_LINE_COLOR)
-        .attr("stroke-width", CONFIG.INTER_CLUSTER_LINE_WIDTH)
-        .attr("opacity", CONFIG.INTER_CLUSTER_LINE_OPACITY)
-        .attr("stroke-dasharray", CONFIG.INTER_CLUSTER_LINE_DASH);
-    }
-
-
     // === Start the animation ===
     addBall();
     
-    console.log(`Starting animation with ${nodes.length} balls in ${CONFIG.NUM_CLUSTERS} clusters`);
+    // Log performance every 2 seconds
+    setInterval(logPerformance, 2000);
 
     // === Download logic ===
     document.getElementById("downloadBtn").addEventListener("click", () => {
