@@ -4,44 +4,10 @@
   <meta charset="UTF-8">
   <title>Circle Packing Export</title>
   <script src="https://d3js.org/d3.v7.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body { 
-      font-family: 'Outfit', sans-serif; 
-      text-align: center; 
-      margin: 2rem; 
-      background: #f8f9fa;
-    }
-    #viz { 
-      border: 1px solid #ccc; 
-      border-radius: 8px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-    }
-    button { 
-      margin-top: 1rem; 
-      padding: 0.5rem 1rem; 
-      font-size: 1rem; 
-      font-family: 'Outfit', sans-serif;
-      background: #0A61B5;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #0851a0;
-    }
-    #status-text {
-      font-size: 1.2rem;
-      font-weight: 500;
-      color: #333;
-      text-anchor: middle;
-      dominant-baseline: middle;
-    }
-    .status-commit { color: #e74c3c; }
-    .status-verify { color: #f39c12; }
-    .status-execute { color: #27ae60; }
-    .status-idle { color: #7f8c8d; }
+    body { font-family: sans-serif; text-align: center; margin: 2rem; }
+    #viz { border: 1px solid #ccc; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
   </style>
 </head>
 <body>
@@ -55,7 +21,7 @@
     const CONFIG = {
       // === GLOBAL SETTINGS (Apply to both clusters) ===
       // Animation timing
-      BALL_APPEAR_DELAY: 30, // ms between ball appearances
+      BALL_APPEAR_DELAY: 500, // ms between ball appearances
       FINAL_SETTLEMENT_TIME: 8000, // ms for final settlement phase
       
       // Force simulation parameters
@@ -110,28 +76,13 @@
       INTER_CLUSTER_LINE_DASH: "1,2", // Dashed line pattern
       
       // === CLUSTERS SETTINGS (Centered) ===
-      NUM_CLUSTERS: 5, // Number of small clusters
+      NUM_CLUSTERS: 9, // Number of small clusters
       MIN_BALLS_PER_CLUSTER: 8, // Minimum balls per small cluster
       MAX_BALLS_PER_CLUSTER: 8, // Maximum balls per small cluster
       BALL_PADDING: 1, // Padding between balls in small clusters
       CLUSTER_RADIUS: 200, // Distance from center for cluster centers
       CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
       
-    };
-
-    // === DAG Overlay Configuration ===
-    CONFIG.DAG = {
-      OUT_DEGREE: 2,          // how many forward edges per cluster (acyclic)
-      CURVE: 0.25,            // 0..0.6, bend amount for link curves
-      ARROW_SIZE: 6,          // arrowhead size (px)
-      EDGE_COLOR: "#0A61B5",
-      EDGE_WIDTH: 1.5,
-      EDGE_OPACITY: 0.7,
-      HIGHLIGHT_COLOR: "#1a8cff",
-      HIGHLIGHT_WIDTH: 3,
-      TOKEN_RADIUS: 4,
-      STEP_MS: 4000,          // interval between demo transactions
-      TEXT_DISPLAY_DURATION: 5000  // how long each status message shows (ms)
     };
 
     // === Generate clusters centered on screen ===
@@ -176,32 +127,6 @@
       cluster.centerY = CONFIG.CENTER_Y + CONFIG.CLUSTER_RADIUS * Math.sin(angle);
     });
     
-    // Fix a topological order by angle around the global center; used to keep DAG acyclic
-    const topoOrder = d3.range(CONFIG.NUM_CLUSTERS).sort((a, b) => {
-      const ax = clusters[a].centerX - CONFIG.CENTER_X;
-      const ay = clusters[a].centerY - CONFIG.CENTER_Y;
-      const bx = clusters[b].centerX - CONFIG.CENTER_X;
-      const by = clusters[b].centerY - CONFIG.CENTER_Y;
-      return Math.atan2(ay, ax) - Math.atan2(by, bx);
-    });
-    const topoIndex = new Map(topoOrder.map((id, i) => [id, i]));
-
-    // Build DAG edges (indices strictly increase; no wrap)
-    function computeDAGEdges() {
-      const edges = [];
-      for (let i = 0; i < topoOrder.length; i++) {
-        const src = topoOrder[i];
-        for (let k = 1; k <= CONFIG.DAG.OUT_DEGREE; k++) {
-          const j = i + k;
-          if (j < topoOrder.length) {
-            edges.push({ source: src, target: topoOrder[j] });
-          }
-        }
-      }
-      return edges;
-    }
-    const DAG_EDGES = computeDAGEdges();
-
     // Pack each cluster individually
     const allNodes = [];
     
@@ -209,7 +134,7 @@
     clusters.forEach(cluster => {
       // Create hierarchy for this cluster
       const clusterData = { children: cluster.balls };
-    const pack = d3.pack()
+      const pack = d3.pack()
         .size([CONFIG.CLUSTER_PACK_SIZE, CONFIG.CLUSTER_PACK_SIZE])
         .padding(CONFIG.BALL_PADDING);
       
@@ -250,40 +175,6 @@
     const nodes = allNodes;
 
     const svg = d3.select("#viz");
-
-    // === DAG Overlay SVG Layers ===
-    // Layering
-    const gInter = svg.append("g").attr("id", "intercluster"); // for DAG overlay
-    const gEdges = gInter.append("g").attr("class", "edges");
-    const gAnim  = gInter.append("g").attr("class", "anim");
-    
-    // Status text element inside SVG
-    const statusText = svg.append("text")
-      .attr("id", "status-text")
-      .attr("x", CONFIG.CENTER_X)
-      .attr("y", 650) // Position near bottom of canvas (700 - 50)
-      .attr("text-anchor", "middle")
-      .attr("dominant-baseline", "middle")
-      .attr("font-family", "Outfit, sans-serif")
-      .attr("font-size", "1.2rem")
-      .attr("font-weight", "500")
-      .attr("fill", "#7f8c8d")
-      .text("Ready to start transaction...");
-
-    // Arrowhead marker definition
-    const defs = svg.append("defs");
-    defs.append("marker")
-      .attr("id", "arrowhead")
-      .attr("viewBox", "0 0 10 10")
-      .attr("refX", 10)
-      .attr("refY", 5)
-      .attr("markerWidth", CONFIG.DAG.ARROW_SIZE)
-      .attr("markerHeight", CONFIG.DAG.ARROW_SIZE)
-      .attr("orient", "auto-start-reverse")
-      .append("path")
-      .attr("d", "M 0 0 L 10 5 L 0 10 z")
-      .attr("fill", CONFIG.DAG.EDGE_COLOR)
-      .attr("opacity", CONFIG.DAG.EDGE_OPACITY);
 
     // === Animation variables ===
     let currentNodes = [];
@@ -376,174 +267,6 @@
       };
     }
 
-    // === Compute cluster statistics (centroid + radius) ===
-    function computeClusterStats(nodesArr) {
-      const map = new Map(); // clusterId -> {cx, cy, R}
-      const grouped = d3.group(nodesArr, d => d.clusterId);
-      grouped.forEach((arr, cid) => {
-        const cx = d3.mean(arr, d => d.x);
-        const cy = d3.mean(arr, d => d.y);
-        // radius ~ furthest circle edge from centroid + margin
-        let R = 0;
-        arr.forEach(n => {
-          const dist = Math.hypot(n.x - cx, n.y - cy) + n.r;
-          if (dist > R) R = dist;
-        });
-        R += 8; // small margin
-        map.set(+cid, { id: +cid, cx, cy, R });
-      });
-      return map;
-    }
-
-    // === Geometry helpers for curved arrow paths ===
-    function rimPoint(A, B) { // point on rim of A facing B
-      const ang = Math.atan2(B.cy - A.cy, B.cx - A.cx);
-      return { x: A.cx + Math.cos(ang) * A.R, y: A.cy + Math.sin(ang) * A.R };
-    }
-
-    function linkPath(A, B) {
-      const p1 = rimPoint(A, B);
-      const p2 = rimPoint(B, A);
-      const mx = (p1.x + p2.x) / 2, my = (p1.y + p2.y) / 2;
-      const dx = p2.x - p1.x, dy = p2.y - p1.y;
-      const L  = Math.hypot(dx, dy) || 1;
-      // Perp normal for curvature
-      const nx = -dy / L, ny = dx / L;
-      const bend = CONFIG.DAG.CURVE * L;  // proportional bend
-      const cx = mx + nx * bend, cy = my + ny * bend;
-      return `M${p1.x},${p1.y} Q${cx},${cy} ${p2.x},${p2.y}`;
-    }
-
-    // === DAG Overlay Renderer ===
-    function drawDAGOverlay(nodesArr) {
-      const stats = computeClusterStats(nodesArr);
-      
-      // Debug: Log cluster stats and DAG edges
-      console.log("Cluster stats:", stats);
-      console.log("DAG edges:", DAG_EDGES);
-      
-      // Filter out edges where cluster stats are missing
-      const data = DAG_EDGES.map(e => ({
-        e,
-        A: stats.get(e.source),
-        B: stats.get(e.target)
-      })).filter(d => d.A && d.B); // Only include edges where both clusters exist
-      
-      console.log("Filtered data:", data);
-
-      const paths = gEdges.selectAll("path.dag")
-        .data(data, d => `${d.e.source}-${d.e.target}`);
-
-      paths.enter()
-        .append("path")
-        .attr("class", "dag")
-        .attr("fill", "none")
-        .attr("stroke", CONFIG.DAG.EDGE_COLOR)
-        .attr("stroke-width", CONFIG.DAG.EDGE_WIDTH)
-        .attr("opacity", CONFIG.DAG.EDGE_OPACITY)
-        .attr("marker-end", "url(#arrowhead)")
-        .merge(paths)
-        .attr("d", d => linkPath(d.A, d.B));
-
-      paths.exit().remove();
-    }
-
-    // === Demo Animation Functions ===
-    function updateStatusText(text, color = '#7f8c8d') {
-      statusText
-        .text(text)
-        .attr("fill", color);
-    }
-
-    function pickTransactionTriple() {
-      // choose source < intermediary < destination by topo order to respect DAG direction
-      const ids = topoOrder.slice();
-      const i1 = Math.floor(Math.random() * (ids.length - 2));
-      const i2 = i1 + 1 + Math.floor(Math.random() * (ids.length - i1 - 1)); // at least +1
-      const i3 = i2 + 1 + Math.floor(Math.random() * (ids.length - i2 - 1)); // at least +1
-      if (i3 >= ids.length) return pickTransactionTriple(); // retry until valid triple
-      return { src: ids[i1], mid: ids[i2], dst: ids[i3] };
-    }
-
-    function animateAlong(pathSel, duration, onEnd) {
-      // draw a moving token along a given path
-      const path = pathSel.node();
-      const L = path.getTotalLength();
-      const token = gAnim.append("circle")
-        .attr("r", CONFIG.DAG.TOKEN_RADIUS)
-        .attr("fill", CONFIG.DAG.HIGHLIGHT_COLOR);
-
-      d3.transition()
-        .duration(duration)
-        .tween("move", () => t => {
-          const p = path.getPointAtLength(t * L);
-          token.attr("cx", p.x).attr("cy", p.y);
-        })
-        .on("end", () => { token.remove(); onEnd && onEnd(); });
-    }
-
-    function pulseCluster(stats, id) {
-      gAnim.append("circle")
-        .attr("cx", stats.get(id).cx)
-        .attr("cy", stats.get(id).cy)
-        .attr("r", stats.get(id).R)
-        .attr("fill", "none")
-        .attr("stroke", CONFIG.DAG.HIGHLIGHT_COLOR)
-        .attr("stroke-width", 2)
-        .attr("opacity", 0.8)
-        .transition()
-        .duration(600)
-        .attr("stroke-width", 0.5)
-        .attr("opacity", 0)
-        .remove();
-    }
-
-    function runDemoTransaction() {
-      const active = currentNodes.length ? currentNodes : nodes;
-      const stats = computeClusterStats(active);
-      const triple = pickTransactionTriple();
-
-      // Find the two path selections (src→mid, mid→dst)
-      const findPath = (a, b) =>
-        gEdges.selectAll("path.dag")
-          .filter(d => d.e.source === a && d.e.target === b);
-
-      const p1 = findPath(triple.src, triple.mid);
-      const p2 = findPath(triple.mid, triple.dst);
-
-      // If missing (shouldn't, but guard), skip and retry next tick
-      if (p1.empty() || p2.empty()) return;
-
-      // Step 1: Commit (source pulse + token to intermediary)
-      updateStatusText(`COMMIT: Starting transaction from cluster ${triple.src}`, '#e74c3c');
-      pulseCluster(stats, triple.src);
-      setTimeout(() => {
-        animateAlong(p1, 2000, () => {
-          // Step 2: Verify (intermediary pulse), then to destination
-          updateStatusText(`VERIFY: Validating at cluster ${triple.mid}`, '#f39c12');
-          pulseCluster(stats, triple.mid);
-          setTimeout(() => {
-            animateAlong(p2, 2000, () => {
-              // Step 3: Execute (destination pulse + global sync pulses for all three)
-              updateStatusText(`EXECUTE: Completing at cluster ${triple.dst}`, '#27ae60');
-              pulseCluster(stats, triple.dst);
-              setTimeout(() => {
-                updateStatusText(`SYNC: All clusters synchronized`, '#27ae60');
-                pulseCluster(stats, triple.src);
-                pulseCluster(stats, triple.mid);
-                pulseCluster(stats, triple.dst);
-                
-                // Reset to idle after sync - much longer delay
-                setTimeout(() => {
-                  updateStatusText(`Waiting for next transaction...`, '#7f8c8d');
-                }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
-              }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
-            });
-          }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
-        });
-      }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
-    }
-
     // === Optimized visualization update with frame rate limiting ===
     function updateVisualization() {
       frameCount++;
@@ -575,8 +298,8 @@
           .attr("y2", d => d.target.y);
       }
       
-      // Update DAG overlay during animation
-      drawDAGOverlay(currentNodes.length ? currentNodes : nodes);
+      // Update inter-cluster lines during animation
+      updateInterClusterConnections();
     }
 
     // === Add new ball to existing simulation ===
@@ -654,8 +377,8 @@
           .attr("opacity", CONFIG.LINE_OPACITY);
       }
 
-      // Update DAG overlay
-      drawDAGOverlay(currentNodes);
+      // Update inter-cluster connections
+      updateInterClusterConnections();
 
       // Update the existing simulation with new nodes (don't restart)
       if (simulation) {
@@ -674,6 +397,53 @@
     }
 
 
+    // === Update inter-cluster connections during animation ===
+    function updateInterClusterConnections() {
+      const interClusterLinks = [];
+      
+      // Calculate cluster centers (average position of balls in each cluster)
+      const clusterCenters = {};
+      const nodesByCluster = {};
+      
+      currentNodes.forEach(node => {
+        if (!nodesByCluster[node.clusterId]) {
+          nodesByCluster[node.clusterId] = [];
+        }
+        nodesByCluster[node.clusterId].push(node);
+      });
+      
+      // Calculate center for each cluster
+      Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
+        const centerX = d3.mean(clusterNodes, d => d.x);
+        const centerY = d3.mean(clusterNodes, d => d.y);
+        clusterCenters[clusterId] = { x: centerX, y: centerY };
+      });
+      
+      // Create links between cluster centers
+      const clusterIds = Object.keys(clusterCenters);
+      for (let i = 0; i < clusterIds.length; i++) {
+        for (let j = i + 1; j < clusterIds.length; j++) {
+          interClusterLinks.push({
+            source: clusterCenters[clusterIds[i]],
+            target: clusterCenters[clusterIds[j]]
+          });
+        }
+      }
+      
+      // Update inter-cluster lines
+      svg.selectAll("line.inter-cluster")
+        .data(interClusterLinks)
+        .join("line")
+        .attr("class", "inter-cluster")
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y)
+        .attr("stroke", CONFIG.INTER_CLUSTER_LINE_COLOR)
+        .attr("stroke-width", CONFIG.INTER_CLUSTER_LINE_WIDTH)
+        .attr("opacity", CONFIG.INTER_CLUSTER_LINE_OPACITY)
+        .attr("stroke-dasharray", CONFIG.INTER_CLUSTER_LINE_DASH);
+    }
 
     // === Final settlement phase ===
     function startFinalSettlement() {
@@ -703,11 +473,11 @@
     function renderStaticClusters() {
       // Render all circles
       circles = svg.selectAll("circle")
-      .data(nodes)
+        .data(nodes)
         .join("circle")
-      .attr("cx", d => d.x)
-      .attr("cy", d => d.y)
-      .attr("r", d => d.r)
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", d => d.r)
         .attr("fill", "none")
         .attr("stroke", CONFIG.STROKE_COLOR)
         .attr("stroke-width", CONFIG.STROKE_WIDTH);
@@ -749,10 +519,57 @@
           .attr("opacity", CONFIG.LINE_OPACITY);
       }
 
-      // Render DAG overlay
-      drawDAGOverlay(nodes);
+      // Render inter-cluster connections
+      renderInterClusterConnections();
     }
 
+    // === Render connections between clusters ===
+    function renderInterClusterConnections() {
+      const interClusterLinks = [];
+      
+      // Calculate cluster centers (average position of balls in each cluster)
+      const clusterCenters = {};
+      const nodesByCluster = {};
+      
+      nodes.forEach(node => {
+        if (!nodesByCluster[node.clusterId]) {
+          nodesByCluster[node.clusterId] = [];
+        }
+        nodesByCluster[node.clusterId].push(node);
+      });
+      
+      // Calculate center for each cluster
+      Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
+        const centerX = d3.mean(clusterNodes, d => d.x);
+        const centerY = d3.mean(clusterNodes, d => d.y);
+        clusterCenters[clusterId] = { x: centerX, y: centerY };
+      });
+      
+      // Create links between all cluster centers
+      const clusterIds = Object.keys(clusterCenters);
+      for (let i = 0; i < clusterIds.length; i++) {
+        for (let j = i + 1; j < clusterIds.length; j++) {
+          interClusterLinks.push({
+            source: clusterCenters[clusterIds[i]],
+            target: clusterCenters[clusterIds[j]]
+          });
+        }
+      }
+      
+      // Render inter-cluster lines
+      svg.selectAll("line.inter-cluster")
+        .data(interClusterLinks)
+        .join("line")
+        .attr("class", "inter-cluster")
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y)
+        .attr("stroke", CONFIG.INTER_CLUSTER_LINE_COLOR)
+        .attr("stroke-width", CONFIG.INTER_CLUSTER_LINE_WIDTH)
+        .attr("opacity", CONFIG.INTER_CLUSTER_LINE_OPACITY)
+        .attr("stroke-dasharray", CONFIG.INTER_CLUSTER_LINE_DASH);
+    }
 
 
     // === Mouse event listeners ===
@@ -780,19 +597,6 @@
     addBall();
     
     console.log(`Starting animation with ${nodes.length} balls in ${CONFIG.NUM_CLUSTERS} clusters`);
-
-    // === Initialize status text ===
-    updateStatusText(`Initializing DAG overlay with ${CONFIG.NUM_CLUSTERS} clusters...`, '#7f8c8d');
-
-    // === Start demo animation loop ===
-    // Total cycle time: 5s (COMMIT) + 2s (token1) + 5s (VERIFY) + 2s (token2) + 5s (EXECUTE) + 5s (SYNC) + 5s (IDLE) = 29s
-    const totalCycleTime = CONFIG.DAG.TEXT_DISPLAY_DURATION * 5 + 4000; // 5 text phases + 2 token animations
-    
-    // Start first transaction immediately, then continue with interval
-    setTimeout(() => {
-      runDemoTransaction();
-      setInterval(runDemoTransaction, totalCycleTime);
-    }, 2000); // Wait 2 seconds for initialization, then start
 
     // === Download logic ===
     document.getElementById("downloadBtn").addEventListener("click", () => {

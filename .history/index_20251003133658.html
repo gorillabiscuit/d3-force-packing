@@ -130,8 +130,7 @@
       HIGHLIGHT_COLOR: "#1a8cff",
       HIGHLIGHT_WIDTH: 3,
       TOKEN_RADIUS: 4,
-      STEP_MS: 4000,          // interval between demo transactions
-      TEXT_DISPLAY_DURATION: 5000  // how long each status message shows (ms)
+      STEP_MS: 4000           // interval between demo transactions
     };
 
     // === Generate clusters centered on screen ===
@@ -261,7 +260,7 @@
     const statusText = svg.append("text")
       .attr("id", "status-text")
       .attr("x", CONFIG.CENTER_X)
-      .attr("y", 650) // Position near bottom of canvas (700 - 50)
+      .attr("y", CONFIG.CANVAS_SIZE - 50) // Position near bottom of canvas
       .attr("text-anchor", "middle")
       .attr("dominant-baseline", "middle")
       .attr("font-family", "Outfit, sans-serif")
@@ -515,33 +514,29 @@
       if (p1.empty() || p2.empty()) return;
 
       // Step 1: Commit (source pulse + token to intermediary)
-      updateStatusText(`COMMIT: Starting transaction from cluster ${triple.src}`, '#e74c3c');
+      updateStatusText(`🔄 COMMIT: Starting transaction from cluster ${triple.src}...`, 'status-commit');
       pulseCluster(stats, triple.src);
-      setTimeout(() => {
-        animateAlong(p1, 2000, () => {
-          // Step 2: Verify (intermediary pulse), then to destination
-          updateStatusText(`VERIFY: Validating at cluster ${triple.mid}`, '#f39c12');
-          pulseCluster(stats, triple.mid);
+      animateAlong(p1, CONFIG.DAG.STEP_MS * 0.45, () => {
+        // Step 2: Verify (intermediary pulse), then to destination
+        updateStatusText(`🔍 VERIFY: Validating at cluster ${triple.mid}...`, 'status-verify');
+        pulseCluster(stats, triple.mid);
+        animateAlong(p2, CONFIG.DAG.STEP_MS * 0.45, () => {
+          // Step 3: Execute (destination pulse + global sync pulses for all three)
+          updateStatusText(`✅ EXECUTE: Completing at cluster ${triple.dst}...`, 'status-execute');
+          pulseCluster(stats, triple.dst);
           setTimeout(() => {
-            animateAlong(p2, 2000, () => {
-              // Step 3: Execute (destination pulse + global sync pulses for all three)
-              updateStatusText(`EXECUTE: Completing at cluster ${triple.dst}`, '#27ae60');
-              pulseCluster(stats, triple.dst);
-              setTimeout(() => {
-                updateStatusText(`SYNC: All clusters synchronized`, '#27ae60');
-                pulseCluster(stats, triple.src);
-                pulseCluster(stats, triple.mid);
-                pulseCluster(stats, triple.dst);
-                
-                // Reset to idle after sync - much longer delay
-                setTimeout(() => {
-                  updateStatusText(`Waiting for next transaction...`, '#7f8c8d');
-                }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
-              }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
-            });
-          }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
+            updateStatusText(`🎉 SYNC: All clusters synchronized!`, 'status-execute');
+            pulseCluster(stats, triple.src);
+            pulseCluster(stats, triple.mid);
+            pulseCluster(stats, triple.dst);
+            
+            // Reset to idle after sync
+            setTimeout(() => {
+              updateStatusText(`⏳ Waiting for next transaction...`, 'status-idle');
+            }, 1000);
+          }, 200);
         });
-      }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
+      });
     }
 
     // === Optimized visualization update with frame rate limiting ===
@@ -782,17 +777,10 @@
     console.log(`Starting animation with ${nodes.length} balls in ${CONFIG.NUM_CLUSTERS} clusters`);
 
     // === Initialize status text ===
-    updateStatusText(`Initializing DAG overlay with ${CONFIG.NUM_CLUSTERS} clusters...`, '#7f8c8d');
+    updateStatusText(`🚀 Initializing DAG overlay with ${CONFIG.NUM_CLUSTERS} clusters...`, 'status-idle');
 
     // === Start demo animation loop ===
-    // Total cycle time: 5s (COMMIT) + 2s (token1) + 5s (VERIFY) + 2s (token2) + 5s (EXECUTE) + 5s (SYNC) + 5s (IDLE) = 29s
-    const totalCycleTime = CONFIG.DAG.TEXT_DISPLAY_DURATION * 5 + 4000; // 5 text phases + 2 token animations
-    
-    // Start first transaction immediately, then continue with interval
-    setTimeout(() => {
-      runDemoTransaction();
-      setInterval(runDemoTransaction, totalCycleTime);
-    }, 2000); // Wait 2 seconds for initialization, then start
+    setInterval(runDemoTransaction, CONFIG.DAG.STEP_MS);
 
     // === Download logic ===
     document.getElementById("downloadBtn").addEventListener("click", () => {
