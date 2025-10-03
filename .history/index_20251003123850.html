@@ -199,7 +199,7 @@
         .force("pack", packForce(nodes))
         .alphaDecay(CONFIG.ALPHA_DECAY) // Slower decay for more settling time
         .on("tick", updateVisualization)
-        .velocityDecay(CONFIG.VELOCITY_DECAY); // Configurable velocity decay
+        .velocityDecay(0.4); // Add velocity decay for smoother animation
         
       // Add mouse repulsion force if enabled
       if (CONFIG.ENABLE_MOUSE_INTERACTION) {
@@ -318,8 +318,8 @@
         y: CONFIG.CENTER_Y,      // Screen center
         targetX: targetNode.x,   // packed position
         targetY: targetNode.y,   // packed position
-        vx: CONFIG.INITIAL_VELOCITY_X, // Configurable initial X velocity
-        vy: CONFIG.INITIAL_VELOCITY_Y  // Configurable initial Y velocity
+        vx: 0,
+        vy: 0
       };
       currentNodes.push(newNode);
 
@@ -385,7 +385,7 @@
       simulation = createSimulation(currentNodes);
       
       // Run simulation for a bit, then add next ball
-      simulation.alpha(CONFIG.INITIAL_ALPHA).restart();
+      simulation.alpha(1).restart();
       
       setTimeout(() => {
         simulation.stop();
@@ -451,7 +451,7 @@
       simulation = createSimulation(currentNodes);
       
       // Run for much longer with stronger pack force
-      simulation.alpha(0.8).restart(); // Use high but not maximum energy for final settlement
+      simulation.alpha(1).restart();
       
       // Let it run for configured time for final settlement
       setTimeout(() => {

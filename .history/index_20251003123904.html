@@ -451,7 +451,7 @@
       simulation = createSimulation(currentNodes);
       
       // Run for much longer with stronger pack force
-      simulation.alpha(0.8).restart(); // Use high but not maximum energy for final settlement
+      simulation.alpha(1).restart();
       
       // Let it run for configured time for final settlement
       setTimeout(() => {
