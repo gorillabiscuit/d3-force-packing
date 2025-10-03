@@ -121,10 +121,49 @@
       cluster.centerY = CONFIG.CENTER_Y + CONFIG.CLUSTER_RADIUS * Math.sin(angle);
     });
     
-    // Pack each cluster individually
+    // Step 4: Pack each cluster individually
     const allNodes = [];
     
-    // Pack clusters (centered)
+    // Pack original cluster (left side) - larger area with separate controls
+    const originalClusterData = { children: originalCluster.balls };
+    const originalPack = d3.pack()
+      .size([CONFIG.LARGE_CLUSTER_PACK_SIZE, CONFIG.LARGE_CLUSTER_PACK_SIZE]) // Configurable packing area
+      .padding(CONFIG.LARGE_CLUSTER_PADDING); // Separate padding for large cluster
+    
+    const originalRoot = d3.hierarchy(originalClusterData).sum(d => d.value);
+    const originalPackedBalls = originalPack(originalRoot).leaves();
+    
+    // Apply size and position to original cluster balls
+    const packedCenterX = CONFIG.LARGE_CLUSTER_PACK_SIZE / 2; // 170
+    const packedCenterY = CONFIG.LARGE_CLUSTER_PACK_SIZE / 2; // 170
+    
+    originalPackedBalls.forEach(ball => {
+      // Apply size multiplier first
+      ball.r *= CONFIG.BALL_SIZE_MULTIPLIER;
+      
+      // Apply radius based on uniform/variable size setting
+      if (CONFIG.UNIFORM_BALL_SIZES) {
+        ball.r = CONFIG.FIXED_BALL_RADIUS; // All balls same size
+      } else {
+        const minRadius = CONFIG.MIN_BALL_RADIUS;
+        const maxRadius = CONFIG.MAX_BALL_RADIUS;
+        const sizeRange = maxRadius - minRadius;
+        ball.r = minRadius + (ball.value * sizeRange); // Variable sizes
+      }
+      
+      // Center the packed layout properly around the desired centerpoint
+      ball.x = ball.x - packedCenterX + originalCluster.centerX;
+      ball.y = ball.y - packedCenterY + originalCluster.centerY;
+      ball.clusterId = originalCluster.id;
+      ball.targetX = ball.x;
+      ball.targetY = ball.y;
+      ball.vx = 0;
+      ball.vy = 0;
+    });
+    
+    allNodes.push(...originalPackedBalls);
+    
+    // Pack smaller clusters (right side)
     clusters.forEach(cluster => {
       // Create hierarchy for this cluster
       const clusterData = { children: cluster.balls };
@@ -189,7 +228,14 @@
     function createSimulation(nodes) {
       const sim = d3.forceSimulation(nodes)
         .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH))
-        .force("collision", d3.forceCollide().radius(d => d.r + CONFIG.BALL_PADDING))
+        .force("collision", d3.forceCollide().radius(d => {
+          // Use different padding based on cluster type
+          if (d.clusterId === -1 || d.clusterId === "-1") {
+            return d.r + CONFIG.LARGE_CLUSTER_PADDING;
+          } else {
+            return d.r + CONFIG.BALL_PADDING;
+          }
+        }))
         .force("pack", packForce(nodes))
         .alphaDecay(CONFIG.ALPHA_DECAY) // Slower decay for more settling time
         .on("tick", updateVisualization)
@@ -304,12 +350,14 @@
         return;
       }
 
-      // Add new node at screen center with target packed position
+      // Add new node at its cluster center with target packed position
       const targetNode = nodes[currentNodes.length];
       const newNode = {
         ...targetNode,
-        x: CONFIG.CENTER_X,      // Screen center
-        y: CONFIG.CENTER_Y,      // Screen center
+        x: targetNode.clusterId === -1 || targetNode.clusterId === "-1" 
+          ? CONFIG.CANVAS_SIZE / 4  // Large cluster center (left half midpoint)
+          : (CONFIG.CANVAS_SIZE * 3) / 4,  // Small clusters center (right half midpoint)
+        y: CONFIG.CENTER_Y,      // Vertically centered (350)
         targetX: targetNode.x,   // packed position
         targetY: targetNode.y,   // packed position
         vx: 0,
@@ -347,14 +395,27 @@
           nodesByCluster[node.clusterId].push(node);
         });
         
-        // Create links for each cluster (connect within each cluster)
+        // Create links for each cluster (completely separate)
         Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
-          for (let i = 0; i < clusterNodes.length; i++) {
-            for (let j = i + 1; j < clusterNodes.length; j++) {
-              links.push({ 
-                source: clusterNodes[i], 
-                target: clusterNodes[j] 
-              });
+          if (clusterId === "-1" || clusterId === -1) {
+            // Original cluster: connect all balls to each other (isolated)
+            for (let i = 0; i < clusterNodes.length; i++) {
+              for (let j = i + 1; j < clusterNodes.length; j++) {
+                links.push({ 
+                  source: clusterNodes[i], 
+                  target: clusterNodes[j] 
+                });
+              }
+            }
+          } else {
+            // Smaller clusters: connect only within each cluster (isolated from original)
+            for (let i = 0; i < clusterNodes.length; i++) {
+              for (let j = i + 1; j < clusterNodes.length; j++) {
+                links.push({ 
+                  source: clusterNodes[i], 
+                  target: clusterNodes[j] 
+                });
+              }
             }
           }
         });
@@ -374,6 +435,9 @@
       // Update inter-cluster connections
       updateInterClusterConnections();
 
+      // Draw centerpoint markers (HIDDEN)
+      // drawCenterpointMarkers();
+
       // Create new simulation with updated nodes
       if (simulation) simulation.stop();
       simulation = createSimulation(currentNodes);
@@ -387,6 +451,57 @@
       }, CONFIG.BALL_APPEAR_DELAY);
     }
 
+    // === Draw centerpoint markers ===
+    function drawCenterpointMarkers() {
+      // Large cluster centerpoint (left half)
+      svg.selectAll("circle.large-cluster-center")
+        .data([{x: CONFIG.CANVAS_SIZE / 4, y: CONFIG.CENTER_Y, label: "Large Cluster"}])
+        .join("circle")
+        .attr("class", "large-cluster-center")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", 8)
+        .attr("fill", "#FF6B6B")
+        .attr("stroke", "#FFFFFF")
+        .attr("stroke-width", 2);
+
+      // Small clusters centerpoint (right half)
+      svg.selectAll("circle.small-clusters-center")
+        .data([{x: (CONFIG.CANVAS_SIZE * 3) / 4, y: CONFIG.CENTER_Y, label: "Small Clusters"}])
+        .join("circle")
+        .attr("class", "small-clusters-center")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", 8)
+        .attr("fill", "#4ECDC4")
+        .attr("stroke", "#FFFFFF")
+        .attr("stroke-width", 2);
+
+      // Add labels
+      svg.selectAll("text.large-cluster-label")
+        .data([{x: CONFIG.CANVAS_SIZE / 4, y: CONFIG.CENTER_Y - 20, text: "Large Cluster"}])
+        .join("text")
+        .attr("class", "large-cluster-label")
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#FF6B6B")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .text(d => d.text);
+
+      svg.selectAll("text.small-clusters-label")
+        .data([{x: (CONFIG.CANVAS_SIZE * 3) / 4, y: CONFIG.CENTER_Y - 20, text: "Small Clusters"}])
+        .join("text")
+        .attr("class", "small-clusters-label")
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#4ECDC4")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .text(d => d.text);
+    }
 
     // === Update inter-cluster connections during animation ===
     function updateInterClusterConnections() {
@@ -403,14 +518,16 @@
         nodesByCluster[node.clusterId].push(node);
       });
       
-      // Calculate center for each cluster
+      // Calculate center for each cluster (exclude original cluster completely)
       Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
-        const centerX = d3.mean(clusterNodes, d => d.x);
-        const centerY = d3.mean(clusterNodes, d => d.y);
-        clusterCenters[clusterId] = { x: centerX, y: centerY };
+        if (clusterId !== "-1" && clusterId !== -1) { // Skip original cluster (both string and number)
+          const centerX = d3.mean(clusterNodes, d => d.x);
+          const centerY = d3.mean(clusterNodes, d => d.y);
+          clusterCenters[clusterId] = { x: centerX, y: centerY };
+        }
       });
       
-      // Create links between cluster centers
+      // Create links between smaller cluster centers only
       const clusterIds = Object.keys(clusterCenters);
       for (let i = 0; i < clusterIds.length; i++) {
         for (let j = i + 1; j < clusterIds.length; j++) {
@@ -486,14 +603,27 @@
           nodesByCluster[node.clusterId].push(node);
         });
         
-        // Create links only within each cluster
+        // Create links only within each cluster (completely separate)
         Object.entries(nodesByCluster).forEach(([clusterId, clusterNodes]) => {
-          for (let i = 0; i < clusterNodes.length; i++) {
-            for (let j = i + 1; j < clusterNodes.length; j++) {
-              links.push({ 
-                source: clusterNodes[i], 
-                target: clusterNodes[j] 
-              });
+          if (clusterId === "-1" || clusterId === -1) {
+            // Original cluster: connect all balls to each other (isolated)
+            for (let i = 0; i < clusterNodes.length; i++) {
+              for (let j = i + 1; j < clusterNodes.length; j++) {
+                links.push({ 
+                  source: clusterNodes[i], 
+                  target: clusterNodes[j] 
+                });
+              }
+            }
+          } else {
+            // Smaller clusters: connect only within each cluster (isolated from original)
+            for (let i = 0; i < clusterNodes.length; i++) {
+              for (let j = i + 1; j < clusterNodes.length; j++) {
+                links.push({ 
+                  source: clusterNodes[i], 
+                  target: clusterNodes[j] 
+                });
+              }
             }
           }
         });
@@ -512,6 +642,9 @@
 
       // Render inter-cluster connections
       renderInterClusterConnections();
+      
+      // Draw centerpoint markers (HIDDEN)
+      // drawCenterpointMarkers();
     }
 
     // === Render connections between clusters ===

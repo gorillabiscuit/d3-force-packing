@@ -387,6 +387,57 @@
       }, CONFIG.BALL_APPEAR_DELAY);
     }
 
+    // === Draw centerpoint markers ===
+    function drawCenterpointMarkers() {
+      // Large cluster centerpoint (left half)
+      svg.selectAll("circle.large-cluster-center")
+        .data([{x: CONFIG.CANVAS_SIZE / 4, y: CONFIG.CENTER_Y, label: "Large Cluster"}])
+        .join("circle")
+        .attr("class", "large-cluster-center")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", 8)
+        .attr("fill", "#FF6B6B")
+        .attr("stroke", "#FFFFFF")
+        .attr("stroke-width", 2);
+
+      // Small clusters centerpoint (right half)
+      svg.selectAll("circle.small-clusters-center")
+        .data([{x: (CONFIG.CANVAS_SIZE * 3) / 4, y: CONFIG.CENTER_Y, label: "Small Clusters"}])
+        .join("circle")
+        .attr("class", "small-clusters-center")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", 8)
+        .attr("fill", "#4ECDC4")
+        .attr("stroke", "#FFFFFF")
+        .attr("stroke-width", 2);
+
+      // Add labels
+      svg.selectAll("text.large-cluster-label")
+        .data([{x: CONFIG.CANVAS_SIZE / 4, y: CONFIG.CENTER_Y - 20, text: "Large Cluster"}])
+        .join("text")
+        .attr("class", "large-cluster-label")
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#FF6B6B")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .text(d => d.text);
+
+      svg.selectAll("text.small-clusters-label")
+        .data([{x: (CONFIG.CANVAS_SIZE * 3) / 4, y: CONFIG.CENTER_Y - 20, text: "Small Clusters"}])
+        .join("text")
+        .attr("class", "small-clusters-label")
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#4ECDC4")
+        .attr("font-size", "12px")
+        .attr("font-weight", "bold")
+        .text(d => d.text);
+    }
 
     // === Update inter-cluster connections during animation ===
     function updateInterClusterConnections() {
