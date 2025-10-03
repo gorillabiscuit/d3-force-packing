@@ -220,7 +220,7 @@
       const smallPackedCenterX = CONFIG.CLUSTER_PACK_SIZE / 2; // 60
       const smallPackedCenterY = CONFIG.CLUSTER_PACK_SIZE / 2; // 60
       
-      packedBalls.forEach((ball, i) => {
+      packedBalls.forEach(ball => {
         // Apply size multiplier first
         ball.r *= CONFIG.BALL_SIZE_MULTIPLIER;
         
@@ -238,7 +238,7 @@
         ball.x = ball.x - smallPackedCenterX + cluster.centerX;
         ball.y = ball.y - smallPackedCenterY + cluster.centerY;
         ball.clusterId = cluster.id;
-        ball.isFirstInCluster = (i === 0); // First ball in this cluster (index 0)
+        ball.isFirstInCluster = (packedBalls.length === 0); // First ball in this cluster
         ball.targetX = ball.x;
         ball.targetY = ball.y;
         ball.vx = 0;
@@ -290,7 +290,6 @@
     let currentNodes = [];
     let simulation = null;
     let circles = null;
-    let groups = null;
     let lines = null;
     let frameCount = 0;
     let lastFrameTime = 0;
@@ -517,28 +516,28 @@
       if (p1.empty() || p2.empty()) return;
 
       // Step 1: Commit (source pulse + token to intermediary)
-      updateStatusText(`COMMIT: Starting transaction from cluster ${triple.src}`, CONFIG.STROKE_COLOR);
+      updateStatusText(`COMMIT: Starting transaction from cluster ${triple.src}`, '#e74c3c');
       pulseCluster(stats, triple.src);
       setTimeout(() => {
         animateAlong(p1, 2000, () => {
           // Step 2: Verify (intermediary pulse), then to destination
-          updateStatusText(`VERIFY: Validating at cluster ${triple.mid}`, CONFIG.STROKE_COLOR);
+          updateStatusText(`VERIFY: Validating at cluster ${triple.mid}`, '#f39c12');
           pulseCluster(stats, triple.mid);
           setTimeout(() => {
             animateAlong(p2, 2000, () => {
               // Step 3: Execute (destination pulse + global sync pulses for all three)
-              updateStatusText(`EXECUTE: Completing at cluster ${triple.dst}`, CONFIG.STROKE_COLOR);
+              updateStatusText(`EXECUTE: Completing at cluster ${triple.dst}`, '#27ae60');
               pulseCluster(stats, triple.dst);
               setTimeout(() => {
-                updateStatusText(`SYNC: All clusters synchronized`, CONFIG.STROKE_COLOR);
+                updateStatusText(`SYNC: All clusters synchronized`, '#27ae60');
                 pulseCluster(stats, triple.src);
                 pulseCluster(stats, triple.mid);
                 pulseCluster(stats, triple.dst);
                 
-                // Reset to idle immediately after sync (no extra delay)
+                // Reset to idle after sync - much longer delay
                 setTimeout(() => {
                   updateStatusText(`Waiting for next transaction...`, CONFIG.STROKE_COLOR);
-                }, 1000); // Short 1-second delay for readability
+                }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
               }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
             });
           }, CONFIG.DAG.TEXT_DISPLAY_DURATION); // Use configurable duration
@@ -561,9 +560,11 @@
       
       lastFrameTime = now;
       
-      // Update circle groups (always needed)
-      if (groups) {
-        groups.attr("transform", d => `translate(${d.x},${d.y})`);
+      // Update circles (always needed)
+      if (circles) {
+        circles
+          .attr("cx", d => d.x)
+          .attr("cy", d => d.y);
       }
       
       // Update lines only if enabled and not too many
@@ -606,34 +607,25 @@
         node.targetY = nodes[i].y;
       });
 
-      // Update circles using groups (Mike Bostock's nested selection pattern)
-      groups = svg.selectAll("g.circle-group")
+      // Update circles
+      circles = svg.selectAll("circle")
         .data(currentNodes)
-        .join("g")
-        .attr("class", "circle-group")
-        .attr("transform", d => `translate(${d.x},${d.y})`);
-
-      // Circles within groups
-      circles = groups.selectAll("circle")
-        .data(d => [d])
         .join("circle")
-        .attr("cx", 0)
-        .attr("cy", 0)
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
         .attr("r", d => d.r)
         .attr("fill", d => d.isFirstInCluster ? CONFIG.STROKE_COLOR : "none")
         .attr("stroke", CONFIG.STROKE_COLOR)
         .attr("stroke-width", CONFIG.STROKE_WIDTH);
 
-      // Text within groups (only for first balls)
-      const firstBalls = currentNodes.filter(d => d.isFirstInCluster);
-      console.log(`Found ${firstBalls.length} first balls:`, firstBalls.map(d => ({clusterId: d.clusterId, isFirstInCluster: d.isFirstInCluster})));
-      
-      groups.selectAll("text.cluster-label")
-        .data(d => d.isFirstInCluster ? [d] : [])
+      // Add cluster number text labels for first ball in each cluster
+      svg.selectAll("text.cluster-label").remove(); // Remove existing labels
+      svg.selectAll("text.cluster-label")
+        .data(currentNodes.filter(d => d.isFirstInCluster))
         .join("text")
         .attr("class", "cluster-label")
-        .attr("x", 0)
-        .attr("y", 0)
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
         .attr("font-family", "Outfit, sans-serif")
@@ -726,34 +718,25 @@
 
     // === Static rendering (no animation) ===
     function renderStaticClusters() {
-      // Render all circles using groups (Mike Bostock's nested selection pattern)
-      const staticGroups = svg.selectAll("g.circle-group")
-        .data(nodes)
-        .join("g")
-        .attr("class", "circle-group")
-        .attr("transform", d => `translate(${d.x},${d.y})`);
-
-      // Circles within groups
-      circles = staticGroups.selectAll("circle")
-        .data(d => [d])
+      // Render all circles
+      circles = svg.selectAll("circle")
+      .data(nodes)
         .join("circle")
-        .attr("cx", 0)
-        .attr("cy", 0)
-        .attr("r", d => d.r)
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", d => d.r)
         .attr("fill", d => d.isFirstInCluster ? CONFIG.STROKE_COLOR : "none")
         .attr("stroke", CONFIG.STROKE_COLOR)
         .attr("stroke-width", CONFIG.STROKE_WIDTH);
 
-      // Text within groups (only for first balls)
-      const staticFirstBalls = nodes.filter(d => d.isFirstInCluster);
-      console.log(`Static: Found ${staticFirstBalls.length} first balls:`, staticFirstBalls.map(d => ({clusterId: d.clusterId, isFirstInCluster: d.isFirstInCluster})));
-      
-      staticGroups.selectAll("text.cluster-label")
-        .data(d => d.isFirstInCluster ? [d] : [])
+      // Add cluster number text labels for first ball in each cluster
+      svg.selectAll("text.cluster-label").remove(); // Remove existing labels
+      svg.selectAll("text.cluster-label")
+        .data(nodes.filter(d => d.isFirstInCluster))
         .join("text")
         .attr("class", "cluster-label")
-        .attr("x", 0)
-        .attr("y", 0)
+        .attr("x", d => d.x)
+        .attr("y", d => d.y)
         .attr("text-anchor", "middle")
         .attr("dominant-baseline", "middle")
         .attr("font-family", "Outfit, sans-serif")
@@ -835,8 +818,8 @@
     updateStatusText(`Initializing DAG overlay with ${CONFIG.NUM_CLUSTERS} clusters...`, CONFIG.STROKE_COLOR);
 
     // === Start demo animation loop ===
-    // Total cycle time: 5s (COMMIT) + 2s (token1) + 5s (VERIFY) + 2s (token2) + 5s (EXECUTE) + 5s (SYNC) + 1s (IDLE) = 25s
-    const totalCycleTime = CONFIG.DAG.TEXT_DISPLAY_DURATION * 5 + 3000; // 5 text phases + 2 token animations + 1s idle
+    // Total cycle time: 5s (COMMIT) + 2s (token1) + 5s (VERIFY) + 2s (token2) + 5s (EXECUTE) + 5s (SYNC) + 5s (IDLE) = 29s
+    const totalCycleTime = CONFIG.DAG.TEXT_DISPLAY_DURATION * 5 + 4000; // 5 text phases + 2 token animations
     
     // Start first transaction immediately, then continue with interval
     setTimeout(() => {

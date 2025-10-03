@@ -835,8 +835,8 @@
     updateStatusText(`Initializing DAG overlay with ${CONFIG.NUM_CLUSTERS} clusters...`, CONFIG.STROKE_COLOR);
 
     // === Start demo animation loop ===
-    // Total cycle time: 5s (COMMIT) + 2s (token1) + 5s (VERIFY) + 2s (token2) + 5s (EXECUTE) + 5s (SYNC) + 1s (IDLE) = 25s
-    const totalCycleTime = CONFIG.DAG.TEXT_DISPLAY_DURATION * 5 + 3000; // 5 text phases + 2 token animations + 1s idle
+    // Total cycle time: 5s (COMMIT) + 2s (token1) + 5s (VERIFY) + 2s (token2) + 5s (EXECUTE) + 5s (SYNC) + 5s (IDLE) = 29s
+    const totalCycleTime = CONFIG.DAG.TEXT_DISPLAY_DURATION * 5 + 4000; // 5 text phases + 2 token animations
     
     // Start first transaction immediately, then continue with interval
     setTimeout(() => {
