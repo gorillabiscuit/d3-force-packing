@@ -39,10 +39,10 @@
       
       // Ball sizing (applies to both clusters)
       BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
-      UNIFORM_BALL_SIZES: true, // Toggle: true = all balls same size, false = variable sizes
-      FIXED_BALL_RADIUS: 15, // Fixed radius for all balls (when UNIFORM_BALL_SIZES = true)
-      MIN_BALL_RADIUS: 14, // Minimum ball radius (when UNIFORM_BALL_SIZES = false)
-      MAX_BALL_RADIUS: 20, // Maximum ball radius (when UNIFORM_BALL_SIZES = false)
+      FIXED_BALL_RADIUS: 15, // Fixed radius for all balls
+      MIN_BALL_RADIUS: 14, // Minimum ball radius
+      MAX_BALL_RADIUS: 20, // Maximum ball radius
+      USE_RANDOM_BALL_SIZES: true, // Toggle between random sizes and fixed size
       
       // Canvas settings
       CANVAS_SIZE: 1400, // Doubled width
@@ -70,18 +70,20 @@
       INTER_CLUSTER_LINE_DASH: "1,2", // Dashed line pattern
       
       // === LARGE CLUSTER SETTINGS (Left side) ===
-      LARGE_CLUSTER_BALL_COUNT: 41, // Number of balls in large cluster
+      LARGE_CLUSTER_BALL_COUNT: 50, // Number of balls in large cluster
       LARGE_CLUSTER_PADDING: 5, // Padding between balls in large cluster
       LARGE_CLUSTER_PACK_SIZE: 600, // Packing area size for large cluster
       
       // === SMALL CLUSTERS SETTINGS (Right side) ===
       NUM_CLUSTERS: 6, // Number of small clusters
-      MIN_BALLS_PER_CLUSTER: 6, // Minimum balls per small cluster
-      MAX_BALLS_PER_CLUSTER: 6, // Maximum balls per small cluster
-      BALL_PADDING: 1, // Padding between balls in small clusters
+      MIN_BALLS_PER_CLUSTER: 5, // Minimum balls per small cluster
+      MAX_BALLS_PER_CLUSTER: 7, // Maximum balls per small cluster
+      BALL_PADDING: 2, // Padding between balls in small clusters
       CLUSTER_RADIUS: 200, // Distance from center for cluster centers
       CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
       
+      // === DEPRECATED/UNUSED SETTINGS ===
+      BALL_COUNT: 15, // DEPRECATED: No longer used, replaced by LARGE_CLUSTER_BALL_COUNT
     };
 
     // === Generate original large cluster + 9 smaller clusters ===
@@ -99,10 +101,10 @@
     const originalNumBalls = CONFIG.LARGE_CLUSTER_BALL_COUNT;
     for (let i = 0; i < originalNumBalls; i++) {
       let ballValue;
-      if (CONFIG.UNIFORM_BALL_SIZES) {
-        ballValue = 1; // Same value for uniform sizes
+      if (CONFIG.USE_RANDOM_BALL_SIZES) {
+        ballValue = Math.random();
       } else {
-        ballValue = Math.random(); // Random value for variable sizes
+        ballValue = 1;
       }
       
       originalCluster.balls.push({
@@ -124,10 +126,12 @@
       // Create balls for this cluster
       const clusterBalls = Array.from({ length: numBalls }, () => {
         let ballValue;
-        if (CONFIG.UNIFORM_BALL_SIZES) {
-          ballValue = 1; // Same value for uniform sizes
+        if (CONFIG.USE_RANDOM_BALL_SIZES) {
+          // Generate random value between 0 and 1 for size variation
+          ballValue = Math.random();
         } else {
-          ballValue = Math.random(); // Random value for variable sizes
+          // Use fixed value for consistent size
+          ballValue = 1;
         }
         
         return {
@@ -174,14 +178,14 @@
       // Apply size multiplier first
       ball.r *= CONFIG.BALL_SIZE_MULTIPLIER;
       
-      // Apply radius based on uniform/variable size setting
-      if (CONFIG.UNIFORM_BALL_SIZES) {
-        ball.r = CONFIG.FIXED_BALL_RADIUS; // All balls same size
-      } else {
+      // Apply min/max radius constraints if using random sizes
+      if (CONFIG.USE_RANDOM_BALL_SIZES) {
         const minRadius = CONFIG.MIN_BALL_RADIUS;
         const maxRadius = CONFIG.MAX_BALL_RADIUS;
         const sizeRange = maxRadius - minRadius;
-        ball.r = minRadius + (ball.value * sizeRange); // Variable sizes
+        ball.r = minRadius + (ball.value * sizeRange);
+      } else {
+        ball.r = CONFIG.FIXED_BALL_RADIUS;
       }
       
       // Center the packed layout properly around the desired centerpoint
@@ -215,14 +219,18 @@
         // Apply size multiplier first
         ball.r *= CONFIG.BALL_SIZE_MULTIPLIER;
         
-        // Apply radius based on uniform/variable size setting
-        if (CONFIG.UNIFORM_BALL_SIZES) {
-          ball.r = CONFIG.FIXED_BALL_RADIUS; // All balls same size
-        } else {
+        // Apply min/max radius constraints if using random sizes
+        if (CONFIG.USE_RANDOM_BALL_SIZES) {
+          // Scale the radius to fit within min/max bounds
           const minRadius = CONFIG.MIN_BALL_RADIUS;
           const maxRadius = CONFIG.MAX_BALL_RADIUS;
           const sizeRange = maxRadius - minRadius;
-          ball.r = minRadius + (ball.value * sizeRange); // Variable sizes
+          
+          // Map the ball's value (0-1) to the radius range
+          ball.r = minRadius + (ball.value * sizeRange);
+        } else {
+          // Use fixed radius
+          ball.r = CONFIG.FIXED_BALL_RADIUS;
         }
         
         // Center the packed layout properly around the desired centerpoint

@@ -70,18 +70,20 @@
       INTER_CLUSTER_LINE_DASH: "1,2", // Dashed line pattern
       
       // === LARGE CLUSTER SETTINGS (Left side) ===
-      LARGE_CLUSTER_BALL_COUNT: 41, // Number of balls in large cluster
+      LARGE_CLUSTER_BALL_COUNT: 50, // Number of balls in large cluster
       LARGE_CLUSTER_PADDING: 5, // Padding between balls in large cluster
       LARGE_CLUSTER_PACK_SIZE: 600, // Packing area size for large cluster
       
       // === SMALL CLUSTERS SETTINGS (Right side) ===
       NUM_CLUSTERS: 6, // Number of small clusters
-      MIN_BALLS_PER_CLUSTER: 6, // Minimum balls per small cluster
-      MAX_BALLS_PER_CLUSTER: 6, // Maximum balls per small cluster
+      MIN_BALLS_PER_CLUSTER: 5, // Minimum balls per small cluster
+      MAX_BALLS_PER_CLUSTER: 7, // Maximum balls per small cluster
       BALL_PADDING: 1, // Padding between balls in small clusters
       CLUSTER_RADIUS: 200, // Distance from center for cluster centers
       CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
       
+      // === DEPRECATED/UNUSED SETTINGS ===
+      BALL_COUNT: 15, // DEPRECATED: No longer used, replaced by LARGE_CLUSTER_BALL_COUNT
     };
 
     // === Generate original large cluster + 9 smaller clusters ===

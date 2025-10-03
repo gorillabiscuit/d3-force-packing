@@ -39,10 +39,11 @@
       
       // Ball sizing (applies to both clusters)
       BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
-      UNIFORM_BALL_SIZES: true, // Toggle: true = all balls same size, false = variable sizes
+      UNIFORM_BALL_SIZES: false, // Toggle: true = all balls same size, false = variable sizes
       FIXED_BALL_RADIUS: 15, // Fixed radius for all balls (when UNIFORM_BALL_SIZES = true)
       MIN_BALL_RADIUS: 14, // Minimum ball radius (when UNIFORM_BALL_SIZES = false)
       MAX_BALL_RADIUS: 20, // Maximum ball radius (when UNIFORM_BALL_SIZES = false)
+      USE_RANDOM_BALL_SIZES: true, // DEPRECATED: Use UNIFORM_BALL_SIZES instead
       
       // Canvas settings
       CANVAS_SIZE: 1400, // Doubled width
@@ -70,18 +71,20 @@
       INTER_CLUSTER_LINE_DASH: "1,2", // Dashed line pattern
       
       // === LARGE CLUSTER SETTINGS (Left side) ===
-      LARGE_CLUSTER_BALL_COUNT: 41, // Number of balls in large cluster
+      LARGE_CLUSTER_BALL_COUNT: 50, // Number of balls in large cluster
       LARGE_CLUSTER_PADDING: 5, // Padding between balls in large cluster
       LARGE_CLUSTER_PACK_SIZE: 600, // Packing area size for large cluster
       
       // === SMALL CLUSTERS SETTINGS (Right side) ===
       NUM_CLUSTERS: 6, // Number of small clusters
-      MIN_BALLS_PER_CLUSTER: 6, // Minimum balls per small cluster
-      MAX_BALLS_PER_CLUSTER: 6, // Maximum balls per small cluster
+      MIN_BALLS_PER_CLUSTER: 5, // Minimum balls per small cluster
+      MAX_BALLS_PER_CLUSTER: 7, // Maximum balls per small cluster
       BALL_PADDING: 1, // Padding between balls in small clusters
       CLUSTER_RADIUS: 200, // Distance from center for cluster centers
       CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
       
+      // === DEPRECATED/UNUSED SETTINGS ===
+      BALL_COUNT: 15, // DEPRECATED: No longer used, replaced by LARGE_CLUSTER_BALL_COUNT
     };
 
     // === Generate original large cluster + 9 smaller clusters ===
