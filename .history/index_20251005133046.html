@@ -84,7 +84,7 @@
 
     // === UI TOGGLE CONFIGURATION ===
     const UI_CONFIG = {
-      SHOW_UI_ELEMENTS: false , // Toggle to hide/show: canvas border, download button, breakpoint debug text
+      SHOW_UI_ELEMENTS: true, // Toggle to hide/show: canvas border, download button, breakpoint debug text
     };
 
     // === RESPONSIVE DETECTION SYSTEM (Phase 1) ===
@@ -417,8 +417,6 @@
       
       // Update debug indicator
       function updateDebugIndicator() {
-        if (!UI_CONFIG.SHOW_UI_ELEMENTS) return;
-        
         const canvasInfo = currentCanvasDimensions ? 
           `${currentCanvasDimensions.width}x${currentCanvasDimensions.height}` : 'calculating...';
         debugDiv.textContent = `${currentBreakpoint} | ${canvasInfo} | ${viewportWidth}x${viewportHeight}`;

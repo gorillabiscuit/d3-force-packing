@@ -84,7 +84,7 @@
 
     // === UI TOGGLE CONFIGURATION ===
     const UI_CONFIG = {
-      SHOW_UI_ELEMENTS: false , // Toggle to hide/show: canvas border, download button, breakpoint debug text
+      SHOW_UI_ELEMENTS: true, // Toggle to hide/show: canvas border, download button, breakpoint debug text
     };
 
     // === RESPONSIVE DETECTION SYSTEM (Phase 1) ===
@@ -396,8 +396,6 @@
     
     // Add visual debug indicator (Phase 1 & 2 testing)
     function addResponsiveDebugIndicator() {
-      if (!UI_CONFIG.SHOW_UI_ELEMENTS) return;
-      
       const debugDiv = document.createElement('div');
       debugDiv.id = 'responsive-debug';
       debugDiv.style.cssText = `
@@ -417,8 +415,6 @@
       
       // Update debug indicator
       function updateDebugIndicator() {
-        if (!UI_CONFIG.SHOW_UI_ELEMENTS) return;
-        
         const canvasInfo = currentCanvasDimensions ? 
           `${currentCanvasDimensions.width}x${currentCanvasDimensions.height}` : 'calculating...';
         debugDiv.textContent = `${currentBreakpoint} | ${canvasInfo} | ${viewportWidth}x${viewportHeight}`;
@@ -1345,28 +1341,6 @@
 
     // Setup cluster groups (will be animated in later)
     setupClusterGroups();
-
-    // === UI Toggle Function ===
-    function applyUIToggle() {
-      const downloadBtn = document.getElementById("downloadBtn");
-      const svgElement = document.getElementById("viz");
-      const debugElement = document.getElementById("responsive-debug");
-      
-      if (UI_CONFIG.SHOW_UI_ELEMENTS) {
-        // Show UI elements
-        if (downloadBtn) downloadBtn.style.display = "block";
-        if (svgElement) svgElement.style.border = "1px solid #ccc";
-        if (debugElement) debugElement.style.display = "block";
-      } else {
-        // Hide UI elements
-        if (downloadBtn) downloadBtn.style.display = "none";
-        if (svgElement) svgElement.style.border = "none";
-        if (debugElement) debugElement.style.display = "none";
-      }
-    }
-
-    // Apply UI toggle on load
-    applyUIToggle();
 
     // === Download logic ===
     document.getElementById("downloadBtn").addEventListener("click", () => {
