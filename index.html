@@ -15,7 +15,7 @@
 </head>
 <body>
  
-  <svg id="viz" width="1400" height="700"></svg>
+  <svg id="viz"></svg>
   <br>
   <button id="downloadBtn">Download SVG</button>
 
@@ -43,10 +43,10 @@
       STROKE_COLOR: "#0A61B5",
       LINE_COLOR: "#0A61B5",
       
-      // Canvas settings
-      CANVAS_SIZE: 1400, // Doubled width for dual layout
-      CENTER_X: 350, // Left side center (for main animation)
-      CENTER_Y: 320, // Moved up 30px (was 350)
+      // Canvas settings (will be overridden by responsive system)
+      CANVAS_SIZE: 1400, // Reference size for scaling calculations
+      CENTER_X: 350, // Reference left side center (will be replaced by responsive)
+      CENTER_Y: 320, // Reference center Y (will be replaced by responsive)
       
       // === LEFT SIDE (MAIN ANIMATION) SETTINGS ===
       // Main animation uses the existing CONFIG settings above
@@ -57,8 +57,8 @@
       RIGHT_CLUSTER_BALL_SIZE: 12, // Fixed size for all right-side balls
       CLUSTER_RADIUS: 200, // Distance from center for cluster centers
       CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
-      RIGHT_SIDE_CENTER_X: 1050, // Right side center (for six clusters)
-      RIGHT_SIDE_CENTER_Y: 320, // Moved up 30px (was 350)
+      RIGHT_SIDE_CENTER_X: 1050, // Reference right side center (will be replaced by responsive)
+      RIGHT_SIDE_CENTER_Y: 320, // Reference right side center Y (will be replaced by responsive)
       
       // Performance settings
       TARGET_FPS: 60, // Target frames per second
@@ -81,6 +81,430 @@
       SMALL_BALL_MIN_RADIUS: 5, // Minimum radius for small balls in main animation
       SMALL_BALL_MAX_RADIUS: 15, // Maximum radius for small balls in main animation
     };
+
+    // === RESPONSIVE DETECTION SYSTEM (Phase 1) ===
+    
+    // Tailwind CSS breakpoints
+    const BREAKPOINTS = {
+      sm: 640,   // mobile landscape/small tablets
+      md: 768,   // tablets
+      lg: 1024,  // small laptops
+      xl: 1280,  // desktops
+      '2xl': 1536 // large screens
+    };
+    
+    // Container max-width constraints
+    const CONTAINER_MAX_WIDTH = 1600; // Increased to allow 2xl breakpoint (1536px) to trigger
+    
+    // Current responsive state
+    let currentBreakpoint = 'xl'; // Default to desktop
+    let viewportWidth = window.innerWidth;
+    let viewportHeight = window.innerHeight;
+    let containerWidth = Math.min(viewportWidth, CONTAINER_MAX_WIDTH);
+    
+    // Responsive detection functions
+    function getCurrentBreakpoint(width) {
+      if (width < BREAKPOINTS.sm) return 'xs';
+      if (width < BREAKPOINTS.md) return 'sm';
+      if (width < BREAKPOINTS.lg) return 'md';
+      if (width < BREAKPOINTS.xl) return 'lg';
+      if (width < BREAKPOINTS['2xl']) return 'xl';
+      return '2xl';
+    }
+    
+    function updateResponsiveState() {
+      const newViewportWidth = window.innerWidth;
+      const newViewportHeight = window.innerHeight;
+      const newContainerWidth = Math.min(newViewportWidth, CONTAINER_MAX_WIDTH);
+      const newBreakpoint = getCurrentBreakpoint(newContainerWidth);
+      
+      const breakpointChanged = newBreakpoint !== currentBreakpoint;
+      const sizeChanged = newViewportWidth !== viewportWidth || newViewportHeight !== viewportHeight;
+      
+      viewportWidth = newViewportWidth;
+      viewportHeight = newViewportHeight;
+      containerWidth = newContainerWidth;
+      currentBreakpoint = newBreakpoint;
+      
+      // Debug logging
+      console.log(`📱 Responsive Update:`, {
+        breakpoint: currentBreakpoint,
+        viewport: `${viewportWidth}x${viewportHeight}`,
+        container: containerWidth,
+        changed: { breakpoint: breakpointChanged, size: sizeChanged }
+      });
+      
+      // Trigger responsive updates if needed
+      if (breakpointChanged || sizeChanged) {
+        handleResponsiveChange(breakpointChanged, sizeChanged);
+      }
+      
+      return { breakpointChanged, sizeChanged };
+    }
+    
+    function handleResponsiveChange(breakpointChanged, sizeChanged) {
+      console.log(`🔄 Handling responsive change:`, { breakpointChanged, sizeChanged });
+      
+      // Phase 1: Just logging - future phases will implement actual responsive behavior
+      if (breakpointChanged) {
+        console.log(`📊 Breakpoint changed to: ${currentBreakpoint}`);
+      }
+      
+      if (sizeChanged) {
+        console.log(`📏 Size changed: ${viewportWidth}x${viewportHeight}`);
+      }
+      
+      // Phase 2: Update canvas dimensions on any responsive change
+      if (breakpointChanged || sizeChanged) {
+        currentCanvasDimensions = updateCanvasDimensions();
+        console.log(`🎯 Canvas updated for ${currentBreakpoint}: ${currentCanvasDimensions.width}x${currentCanvasDimensions.height} (${currentCanvasDimensions.layout})`);
+        
+        // Phase 3: Update layout parameters after canvas dimensions change
+        currentLayoutParams = updateResponsiveLayout();
+        console.log(`🎯 Layout parameters updated for ${currentBreakpoint}`);
+      }
+    }
+    
+    // Set up ResizeObserver for efficient viewport monitoring
+    let resizeObserver;
+    function setupResponsiveMonitoring() {
+      // Initial state
+      updateResponsiveState();
+      
+      // Set up ResizeObserver for container
+      const container = document.body;
+      if (window.ResizeObserver) {
+        resizeObserver = new ResizeObserver(entries => {
+          for (let entry of entries) {
+            updateResponsiveState();
+          }
+        });
+        resizeObserver.observe(container);
+      } else {
+        // Fallback to window resize for older browsers
+        window.addEventListener('resize', updateResponsiveState);
+      }
+      
+      console.log(`🎯 Responsive monitoring initialized - Current: ${currentBreakpoint} (${containerWidth}px)`);
+    }
+    
+    // === RESPONSIVE CANVAS SIZING SYSTEM (Phase 2) ===
+    
+    // Responsive canvas configuration
+    const RESPONSIVE_CONFIG = {
+      // Aspect ratio for canvas (width/height)
+      aspectRatio: 1400 / 700, // 2:1 ratio from original
+      
+      // Breakpoint-specific configurations
+      breakpoints: {
+        xs: { 
+          maxWidth: '100vw', 
+          maxHeight: '60vh',
+          padding: 20,
+          layout: 'stacked', // Vertical stacking for mobile
+          // Text positioning
+          textOffset: 0.8, // Multiplier for text Y position relative to center
+          // Right-side cluster sizing
+          clusterBallSize: 8, // Size of individual cluster balls
+          clusterRadius: 80, // Distance from center for cluster centers
+          clusterPackSize: 60, // Size for individual cluster packing
+        },
+        sm: { 
+          maxWidth: '100vw', 
+          maxHeight: '70vh',
+          padding: 30,
+          layout: 'stacked',
+          // Text positioning
+          textOffset: 0.7,
+          // Right-side cluster sizing
+          clusterBallSize: 10,
+          clusterRadius: 100,
+          clusterPackSize: 80,
+        },
+        md: { 
+          maxWidth: '95vw', 
+          maxHeight: '75vh',
+          padding: 40,
+          layout: 'hybrid', // Hybrid layout for tablets
+          // Text positioning
+          textOffset: 0.25, // 25% of canvas height below center
+          // Right-side cluster sizing
+          clusterBallSize: 12,
+          clusterRadius: 140,
+          clusterPackSize: 100,
+        },
+        lg: { 
+          maxWidth: '90vw', 
+          maxHeight: '80vh',
+          padding: 50,
+          layout: 'dual', // Side-by-side for laptops
+          // Text positioning
+          textOffset: 0.25, // 25% of canvas height below center
+          // Right-side cluster sizing
+          clusterBallSize: 12,
+          clusterRadius: 160,
+          clusterPackSize: 110,
+        },
+        xl: { 
+          maxWidth: '85vw', 
+          maxHeight: '85vh',
+          padding: 60,
+          layout: 'dual',
+          // Text positioning
+          textOffset: 0.25, // 25% of canvas height below center
+          // Right-side cluster sizing
+          clusterBallSize: 12,
+          clusterRadius: 180,
+          clusterPackSize: 120,
+        },
+        '2xl': { 
+          maxWidth: CONTAINER_MAX_WIDTH,
+          maxHeight: '90vh',
+          padding: 80,
+          layout: 'dual',
+          // Text positioning
+          textOffset: 0.25, // 25% of canvas height below center
+          // Right-side cluster sizing
+          clusterBallSize: 14, // Slightly larger for 2xl screens
+          clusterRadius: 220, // Increased for larger screens
+          clusterPackSize: 130, // Increased for larger screens
+        }
+      }
+    };
+    
+    // Calculate responsive canvas dimensions
+    function calculateCanvasDimensions() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      const availableWidth = viewportWidth - (config.padding * 2);
+      const availableHeight = viewportHeight - (config.padding * 2);
+      
+      // Calculate dimensions based on aspect ratio and available space
+      let canvasWidth, canvasHeight;
+      
+      if (config.layout === 'stacked') {
+        // For mobile: use full width, calculate height based on content
+        canvasWidth = Math.min(availableWidth, 600); // Max 600px on mobile
+        canvasHeight = Math.min(availableHeight * 0.8, 800); // 80% of available height, max 800px
+      } else {
+        // For desktop: maintain aspect ratio
+        const widthBasedHeight = availableWidth / RESPONSIVE_CONFIG.aspectRatio;
+        const heightBasedWidth = availableHeight * RESPONSIVE_CONFIG.aspectRatio;
+        
+        if (widthBasedHeight <= availableHeight) {
+          canvasWidth = availableWidth;
+          canvasHeight = widthBasedHeight;
+        } else {
+          canvasWidth = heightBasedWidth;
+          canvasHeight = availableHeight;
+        }
+        
+        // Apply max width constraint for 2xl
+        if (currentBreakpoint === '2xl') {
+          canvasWidth = Math.min(canvasWidth, CONTAINER_MAX_WIDTH);
+          canvasHeight = canvasWidth / RESPONSIVE_CONFIG.aspectRatio;
+        }
+      }
+      
+      return {
+        width: Math.round(canvasWidth),
+        height: Math.round(canvasHeight),
+        layout: config.layout,
+        padding: config.padding
+      };
+    }
+    
+    // Update SVG dimensions responsively
+    function updateCanvasDimensions() {
+      const dimensions = calculateCanvasDimensions();
+      
+      // Update SVG dimensions
+      const svg = d3.select("#viz");
+      svg
+        .attr("width", dimensions.width)
+        .attr("height", dimensions.height);
+      
+      // Update debug info
+      console.log(`📐 Canvas dimensions updated:`, {
+        breakpoint: currentBreakpoint,
+        dimensions: `${dimensions.width}x${dimensions.height}`,
+        layout: dimensions.layout,
+        padding: dimensions.padding
+      });
+      
+      return dimensions;
+    }
+    
+    // Initial canvas sizing
+    let currentCanvasDimensions = updateCanvasDimensions();
+    
+    // Add visual debug indicator (Phase 1 & 2 testing)
+    function addResponsiveDebugIndicator() {
+      const debugDiv = document.createElement('div');
+      debugDiv.id = 'responsive-debug';
+      debugDiv.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 1000;
+        pointer-events: none;
+      `;
+      document.body.appendChild(debugDiv);
+      
+      // Update debug indicator
+      function updateDebugIndicator() {
+        const canvasInfo = currentCanvasDimensions ? 
+          `${currentCanvasDimensions.width}x${currentCanvasDimensions.height}` : 'calculating...';
+        debugDiv.textContent = `${currentBreakpoint} | ${canvasInfo} | ${viewportWidth}x${viewportHeight}`;
+      }
+      
+      // Update on responsive changes
+      const originalHandleChange = handleResponsiveChange;
+      handleResponsiveChange = function(breakpointChanged, sizeChanged) {
+        originalHandleChange(breakpointChanged, sizeChanged);
+        updateDebugIndicator();
+      };
+      
+      // Initial update
+      updateDebugIndicator();
+    }
+    
+    // Add debug indicator
+    addResponsiveDebugIndicator();
+    
+    // === RESPONSIVE LAYOUT CALCULATION FUNCTIONS (Phase 3) ===
+    
+    // Calculate responsive layout parameters
+    function calculateResponsiveLayout() {
+      const canvas = currentCanvasDimensions;
+      const layout = canvas.layout;
+      
+      let layoutParams = {
+        // Canvas dimensions
+        canvasWidth: canvas.width,
+        canvasHeight: canvas.height,
+        
+        // Layout type
+        layout: layout,
+        
+        // Centers and spacing
+        leftCenter: { x: 0, y: 0 },
+        rightCenter: { x: 0, y: 0 },
+        
+        // Scaling factors
+        scaleFactor: 1,
+        
+        // Layout-specific parameters
+        spacing: 0,
+        padding: 0
+      };
+      
+      if (layout === 'stacked') {
+        // Mobile: Stack vertically
+        layoutParams.leftCenter = {
+          x: canvas.width / 2,
+          y: canvas.height * 0.3 // Top third for main animation
+        };
+        layoutParams.rightCenter = {
+          x: canvas.width / 2,
+          y: canvas.height * 0.7 // Bottom third for six clusters
+        };
+        layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.8;
+        layoutParams.spacing = canvas.height * 0.4; // Vertical spacing
+        layoutParams.padding = 20;
+        
+      } else if (layout === 'hybrid') {
+        // Tablet: Hybrid layout with some horizontal space
+        const leftWidth = canvas.width * 0.6;
+        const rightWidth = canvas.width * 0.4;
+        
+        layoutParams.leftCenter = {
+          x: leftWidth / 2,
+          y: canvas.height / 2
+        };
+        layoutParams.rightCenter = {
+          x: leftWidth + (rightWidth / 2),
+          y: canvas.height / 2
+        };
+        layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.9;
+        layoutParams.spacing = canvas.width * 0.6;
+        layoutParams.padding = 30;
+        
+      } else {
+        // Desktop: Dual layout (lg, xl, 2xl)
+        layoutParams.leftCenter = {
+          x: canvas.width / 4, // Left quarter
+          y: canvas.height / 2
+        };
+        layoutParams.rightCenter = {
+          x: (canvas.width * 3) / 4, // Right quarter
+          y: canvas.height / 2
+        };
+        layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700);
+        layoutParams.spacing = canvas.width / 2;
+        layoutParams.padding = 40;
+      }
+      
+      // Ensure minimum scale factor
+      layoutParams.scaleFactor = Math.max(layoutParams.scaleFactor, 0.3);
+      
+      console.log(`📐 Layout calculated for ${currentBreakpoint}:`, {
+        layout: layoutParams.layout,
+        leftCenter: layoutParams.leftCenter,
+        rightCenter: layoutParams.rightCenter,
+        scaleFactor: layoutParams.scaleFactor.toFixed(2),
+        spacing: layoutParams.spacing.toFixed(0)
+      });
+      
+      return layoutParams;
+    }
+    
+    // Get current responsive layout parameters
+    let currentLayoutParams = calculateResponsiveLayout();
+    
+    // Update layout parameters when responsive state changes
+    function updateResponsiveLayout() {
+      currentLayoutParams = calculateResponsiveLayout();
+      console.log(`🎯 Layout updated for ${currentBreakpoint} breakpoint`);
+      return currentLayoutParams;
+    }
+    
+    // Helper functions for responsive positioning
+    function getResponsiveCenterX(side = 'left') {
+      return side === 'left' ? currentLayoutParams.leftCenter.x : currentLayoutParams.rightCenter.x;
+    }
+    
+    function getResponsiveCenterY(side = 'left') {
+      return side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
+    }
+    
+    function getResponsiveScaleFactor() {
+      return currentLayoutParams.scaleFactor;
+    }
+    
+    function getResponsiveSpacing() {
+      return currentLayoutParams.spacing;
+    }
+    
+    function getResponsivePadding() {
+      return currentLayoutParams.padding;
+    }
+    
+    function isStackedLayout() {
+      return currentLayoutParams.layout === 'stacked';
+    }
+    
+    function isDualLayout() {
+      return currentLayoutParams.layout === 'dual';
+    }
+    
+    // Initialize responsive system after all responsive configs are defined
+    setupResponsiveMonitoring();
 
     // === Generate circles with proper circle packing and spacing control ===
     let packedNodes;
@@ -107,8 +531,10 @@
         // Better initial positioning to avoid all starting at center
         const angle = Math.random() * 2 * Math.PI;
         const distance = Math.random() * 200 + 50; // Random distance from center (50-250px)
-        const x = CONFIG.CENTER_X + Math.cos(angle) * distance;
-        const y = CONFIG.CENTER_Y + Math.sin(angle) * distance;
+        const centerX = getResponsiveCenterX('left');
+        const centerY = getResponsiveCenterY('left');
+        const x = centerX + Math.cos(angle) * distance;
+        const y = centerY + Math.sin(angle) * distance;
         
         return {
           x: x,
@@ -120,12 +546,12 @@
     } else {
       // Use D3's pack algorithm (original behavior)
       const data = { children: Array.from({ length: CONFIG.BALL_COUNT }, () => ({ value: Math.random() })) };
-      
-      const pack = d3.pack()
+
+    const pack = d3.pack()
         .size([CONFIG.CANVAS_SIZE * 0.8, CONFIG.CANVAS_SIZE * 0.8])
         .padding(0); // No padding in pack algorithm
 
-      const root = d3.hierarchy(data).sum(d => d.value);
+    const root = d3.hierarchy(data).sum(d => d.value);
       packedNodes = pack(root).leaves();
       
       // Apply size multiplier and set radius based on mode
@@ -147,17 +573,19 @@
     
     if (CONFIG.USE_ABSOLUTE_SIZING) {
       // For absolute sizing, start all circles at center and let force simulation position them
+      const centerX = getResponsiveCenterX('left');
+      const centerY = getResponsiveCenterY('left');
       nodes = packedNodes.map(node => ({
         ...node,
-        x: CONFIG.CENTER_X,
-        y: CONFIG.CENTER_Y,
-        targetX: CONFIG.CENTER_X,
-        targetY: CONFIG.CENTER_Y,
+        x: centerX,
+        y: centerY,
+        targetX: centerX,
+        targetY: centerY,
         vx: 0,
         vy: 0
       }));
     } else {
-      // For packed sizing, center the packed layout
+      // For packed sizing, center the packed layout using responsive centers
       const bounds = d3.extent(packedNodes, d => d.x - d.r);
       const boundsY = d3.extent(packedNodes, d => d.y - d.r);
       const minX = bounds[0];
@@ -167,8 +595,10 @@
       
       const layoutWidth = maxX - minX;
       const layoutHeight = maxY - minY;
-      const offsetX = (CONFIG.CANVAS_SIZE - layoutWidth) / 2 - minX;
-      const offsetY = (CONFIG.CANVAS_SIZE - layoutHeight) / 2 - minY;
+      const centerX = getResponsiveCenterX('left');
+      const centerY = getResponsiveCenterY('left');
+      const offsetX = centerX - (minX + layoutWidth / 2);
+      const offsetY = centerY - (minY + layoutHeight / 2);
       
       // Create final nodes with target positions
       nodes = packedNodes.map(node => ({
@@ -183,7 +613,7 @@
     }
 
     const svg = d3.select("#viz");
-    
+
     // === Create separate groups for each visualization ===
     const mainAnimationGroup = svg.append("g").attr("id", "main-animation");
 
@@ -215,8 +645,8 @@
         // Don't apply force if animation is complete
         if (leftAnimationComplete) return;
         
-        const centerX = CONFIG.CENTER_X;
-        const centerY = CONFIG.CENTER_Y;
+        const centerX = getResponsiveCenterX('left');
+        const centerY = getResponsiveCenterY('left');
         const strength = 0.01; // Very weak force
         
         currentNodes.forEach(node => {
@@ -318,9 +748,9 @@
       circles = mainAnimationGroup.selectAll("circle")
         .data(currentNodes)
         .join("circle")
-        .attr("cx", d => d.x)
-        .attr("cy", d => d.y)
-        .attr("r", d => d.r)
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y)
+      .attr("r", d => d.r)
         .attr("fill", "none")
         .attr("stroke", CONFIG.STROKE_COLOR)
         .attr("stroke-width", CONFIG.STROKE_WIDTH);
@@ -415,24 +845,80 @@
 
     // === Text Display Functions ===
     function showLeftSideText() {
+      const centerX = getResponsiveCenterX('left');
+      const centerY = getResponsiveCenterY('left');
+      const scaleFactor = getResponsiveScaleFactor();
+      const fontSize = Math.max(16, 24 * scaleFactor);
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      
+      // Calculate text offset using responsive configuration
+      let textOffset;
+      if (isStackedLayout()) {
+        // For stacked layouts, use multiplier relative to center
+        textOffset = centerY + (centerY * config.textOffset);
+      } else {
+        // For dual/hybrid layouts, use percentage of canvas height
+        textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
+      }
+      
+      // Ensure text stays within canvas bounds
+      textOffset = Math.min(textOffset, currentCanvasDimensions.height - 20);
+      
+      console.log(`📝 Left text positioning:`, {
+        breakpoint: currentBreakpoint,
+        centerY: centerY,
+        canvasHeight: currentCanvasDimensions.height,
+        textOffset: textOffset,
+        fontSize: fontSize,
+        configTextOffset: config.textOffset
+      });
+      
       mainAnimationGroup.append("text")
-        .attr("x", CONFIG.CENTER_X)
-        .attr("y", CONFIG.CENTER_Y + 320) // Moved down 30px (was 250)
+        .attr("x", centerX)
+        .attr("y", textOffset)
         .attr("text-anchor", "middle")
         .attr("font-family", "Outfit, sans-serif")
-        .attr("font-size", "24px")
+        .attr("font-size", `${fontSize}px`)
         .attr("font-weight", "600")
         .attr("fill", CONFIG.STROKE_COLOR)
         .text("Traditional Node distribution");
     }
 
     function showRightSideText() {
+      const centerX = getResponsiveCenterX('right');
+      const centerY = getResponsiveCenterY('right');
+      const scaleFactor = getResponsiveScaleFactor();
+      const fontSize = Math.max(16, 24 * scaleFactor);
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      
+      // Calculate text offset using responsive configuration
+      let textOffset;
+      if (isStackedLayout()) {
+        // For stacked layouts, use multiplier relative to center
+        textOffset = centerY + (centerY * config.textOffset);
+      } else {
+        // For dual/hybrid layouts, use percentage of canvas height
+        textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
+      }
+      
+      // Ensure text stays within canvas bounds
+      textOffset = Math.min(textOffset, currentCanvasDimensions.height - 20);
+      
+      console.log(`📝 Right text positioning:`, {
+        breakpoint: currentBreakpoint,
+        centerY: centerY,
+        canvasHeight: currentCanvasDimensions.height,
+        textOffset: textOffset,
+        fontSize: fontSize,
+        configTextOffset: config.textOffset
+      });
+      
       sixClusterGroup.append("text")
-        .attr("x", CONFIG.RIGHT_SIDE_CENTER_X)
-        .attr("y", CONFIG.RIGHT_SIDE_CENTER_Y + 320) // Moved down 30px (was 250)
+        .attr("x", centerX)
+        .attr("y", textOffset)
         .attr("text-anchor", "middle")
         .attr("font-family", "Outfit, sans-serif")
-        .attr("font-size", "24px")
+        .attr("font-size", `${fontSize}px`)
         .attr("font-weight", "600")
         .attr("fill", CONFIG.STROKE_COLOR)
         .text("Cerebral Node distribution");
@@ -530,20 +1016,27 @@
         // Fixed number of balls per cluster (all clusters same)
         const numBalls = CONFIG.BALLS_PER_CLUSTER;
         
-        // Create balls for this cluster with fixed size
+        // Get responsive configuration for cluster sizing
+        const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+        
+        // Create balls for this cluster with responsive size
         const clusterBalls = Array.from({ length: numBalls }, () => {
           return {
             id: ballId++,
             value: 1, // Fixed value for uniform size
             clusterId: i,
-            r: CONFIG.RIGHT_CLUSTER_BALL_SIZE // Fixed radius for all right-side balls
+            r: config.clusterBallSize // Responsive radius for all right-side balls
           };
         });
         
         // Calculate cluster center position (radial layout around right side center)
         const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
-        const centerX = CONFIG.RIGHT_SIDE_CENTER_X + Math.cos(angle) * CONFIG.CLUSTER_RADIUS;
-        const centerY = CONFIG.RIGHT_SIDE_CENTER_Y + Math.sin(angle) * CONFIG.CLUSTER_RADIUS;
+        const rightCenterX = getResponsiveCenterX('right');
+        const rightCenterY = getResponsiveCenterY('right');
+        const scaleFactor = getResponsiveScaleFactor();
+        const clusterRadius = config.clusterRadius * scaleFactor;
+        const centerX = rightCenterX + Math.cos(angle) * clusterRadius;
+        const centerY = rightCenterY + Math.sin(angle) * clusterRadius;
         
         clusters.push({
           id: i,
@@ -559,10 +1052,13 @@
     // Generate six clusters
     const sixClusters = createSixClusters();
 
-    // Pack each cluster independently with fixed ball sizes
+    // Pack each cluster independently with responsive sizing
+    const scaleFactor = getResponsiveScaleFactor();
+    const packConfig = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
     sixClusters.forEach(cluster => {
+      const packSize = packConfig.clusterPackSize * scaleFactor;
       const pack = d3.pack()
-        .size([CONFIG.CLUSTER_PACK_SIZE, CONFIG.CLUSTER_PACK_SIZE])
+        .size([packSize, packSize])
         .padding(2);
       
       const root = d3.hierarchy({ children: cluster.balls }).sum(d => d.value);
@@ -571,8 +1067,8 @@
       // Update cluster balls with packed positions (keep fixed radius)
       packedBalls.forEach((packedBall, i) => {
         const ball = cluster.balls[i];
-        ball.x = packedBall.x + cluster.centerX - CONFIG.CLUSTER_PACK_SIZE / 2;
-        ball.y = packedBall.y + cluster.centerY - CONFIG.CLUSTER_PACK_SIZE / 2;
+        ball.x = packedBall.x + cluster.centerX - packSize / 2;
+        ball.y = packedBall.y + cluster.centerY - packSize / 2;
         // Keep the fixed radius we set earlier
         // ball.r remains CONFIG.RIGHT_CLUSTER_BALL_SIZE
       });
@@ -622,12 +1118,20 @@
       });
     }
 
-    // Debug: Log cluster positions
-    console.log(`Six clusters created: ${sixClusters.length} clusters, ${CONFIG.BALLS_PER_CLUSTER} balls each, size: ${CONFIG.RIGHT_CLUSTER_BALL_SIZE}px`);
+    // Debug: Log cluster positions with responsive configuration
+    const debugConfig = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+    console.log(`📊 Six clusters created for ${currentBreakpoint}:`, {
+      clusters: sixClusters.length,
+      ballsPerCluster: CONFIG.BALLS_PER_CLUSTER,
+      ballSize: debugConfig.clusterBallSize,
+      clusterRadius: debugConfig.clusterRadius,
+      packSize: debugConfig.clusterPackSize,
+      scaleFactor: scaleFactor.toFixed(2)
+    });
     sixClusters.forEach((cluster, i) => {
-      console.log(`Cluster ${i}: center (${cluster.centerX}, ${cluster.centerY}), balls: ${cluster.balls.length}`);
+      console.log(`Cluster ${i}: center (${cluster.centerX.toFixed(1)}, ${cluster.centerY.toFixed(1)}), balls: ${cluster.balls.length}`);
       if (cluster.balls.length > 0) {
-        console.log(`  First ball: x=${cluster.balls[0].x}, y=${cluster.balls[0].y}, r=${cluster.balls[0].r}`);
+        console.log(`  First ball: x=${cluster.balls[0].x.toFixed(1)}, y=${cluster.balls[0].y.toFixed(1)}, r=${cluster.balls[0].r}`);
       }
     });
 
