@@ -212,6 +212,9 @@
     // === Custom weak center force (Mike Bostock approach) ===
     function weakCenterForce() {
       return function() {
+        // Don't apply force if animation is complete
+        if (leftAnimationComplete) return;
+        
         const centerX = CONFIG.CENTER_X;
         const centerY = CONFIG.CENTER_Y;
         const strength = 0.01; // Very weak force
@@ -252,6 +255,9 @@
 
     // === Optimized visualization update with frame rate limiting ===
     function updateVisualization() {
+      // Don't update if left animation is complete (frozen)
+      if (leftAnimationComplete) return;
+      
       frameCount++;
       
       // Skip frames for better performance
@@ -372,8 +378,15 @@
       
       // Let it run for configured time for final settlement
       setTimeout(() => {
-        if (simulation) simulation.stop();
-        console.log("Final settlement complete!");
+        if (simulation) {
+          simulation.stop();
+          // Remove all forces to prevent further movement
+          simulation.force("charge", null);
+          simulation.force("collision", null);
+          simulation.force("pack", null);
+          simulation.force("center", null);
+        }
+        console.log("Final settlement complete - animation frozen!");
         leftAnimationComplete = true;
         
         // Show left side text and start right animation after delay
