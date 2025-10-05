@@ -162,18 +162,6 @@
         // Phase 3: Update layout parameters after canvas dimensions change
         currentLayoutParams = updateResponsiveLayout();
         console.log(`🎯 Layout parameters updated for ${currentBreakpoint}`);
-        
-        // Phase 4: Update cluster positions with new layout parameters (if clusters exist)
-        try {
-          if (typeof updateClusterPositions === 'function' && typeof sixClusters !== 'undefined' && sixClusters && sixClusters.length > 0) {
-            updateClusterPositions();
-            console.log(`🎯 Cluster positions updated for ${currentBreakpoint}`);
-          } else {
-            console.log(`⚠️ Skipping cluster position update - clusters not yet initialized`);
-          }
-        } catch (error) {
-          console.log(`⚠️ Skipping cluster position update - ${error.message}`);
-        }
       }
     }
     
@@ -261,14 +249,14 @@
           // Animation center positioning
           centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
-          textOffset: 0.4, // 25% of canvas height below center
+          textOffset: 0.5, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.7,
           leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
           clusterBallSize: 7,
-          clusterRadius: 200,
-          clusterPackSize: 130,
+          clusterRadius: 220,
+          clusterPackSize: 150,
         },
         lg: { 
           maxWidth: '90vw', 
@@ -298,11 +286,11 @@
           textOffset: 0.42, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 1.0,
-          leftLargeBallMultiplier: .9,
+          leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
-          clusterBallSize: 10,
-          clusterRadius: 220,
-          clusterPackSize: 120,
+          clusterBallSize: 8,
+          clusterRadius: 180,
+          clusterPackSize: 100,
         },
         '2xl': { 
           maxWidth: CONTAINER_MAX_WIDTH,
@@ -471,9 +459,9 @@
         layoutParams.padding = 20;
         
       } else if (layout === 'hybrid') {
-        // Tablet: Hybrid layout with equal horizontal space
-        const leftWidth = canvas.width * 0.5;
-        const rightWidth = canvas.width * 0.5;
+        // Tablet: Hybrid layout with some horizontal space
+        const leftWidth = canvas.width * 0.6;
+        const rightWidth = canvas.width * 0.4;
         
         layoutParams.leftCenter = {
           x: leftWidth / 2,
@@ -484,7 +472,7 @@
           y: canvas.height / 2
         };
         layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.9;
-        layoutParams.spacing = canvas.width * 0.5;
+        layoutParams.spacing = canvas.width * 0.6;
         layoutParams.padding = 30;
         
       } else {
@@ -1165,6 +1153,31 @@
 
     // Generate six clusters
     let sixClusters = createSixClusters();
+    
+    // Function to update cluster positions when layout changes
+    function updateClusterPositions() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      const scaleFactor = getResponsiveScaleFactor();
+      
+      sixClusters.forEach((cluster, i) => {
+        // Recalculate cluster center position based on current responsive layout
+        const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
+        const rightCenterX = getResponsiveCenterX('right');
+        const rightCenterY = getResponsiveCenterY('right');
+        const clusterRadius = config.clusterRadius * scaleFactor;
+        
+        // Update cluster center position
+        cluster.centerX = rightCenterX + Math.cos(angle) * clusterRadius;
+        cluster.centerY = rightCenterY + Math.sin(angle) * clusterRadius;
+        
+        console.log(`🔄 Updated cluster ${i} position: (${cluster.centerX.toFixed(1)}, ${cluster.centerY.toFixed(1)})`);
+      });
+      
+      // Update the visual cluster groups if they exist
+      if (typeof updateClusterGroups === 'function') {
+        updateClusterGroups();
+      }
+    }
 
     // Pack each cluster independently with responsive sizing
     const scaleFactor = getResponsiveScaleFactor();
@@ -1190,50 +1203,6 @@
 
     // Create separate SVG group for six clusters to avoid conflicts
     const sixClusterGroup = svg.append("g").attr("id", "six-clusters");
-
-    // Function to update cluster positions when layout changes
-    function updateClusterPositions() {
-      // Safety check: only update if clusters exist
-      if (!sixClusters || sixClusters.length === 0) {
-        console.log(`⚠️ Skipping cluster position update - clusters not yet initialized`);
-        return;
-      }
-      
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      const scaleFactor = getResponsiveScaleFactor();
-      
-      sixClusters.forEach((cluster, i) => {
-        // Recalculate cluster center position based on current responsive layout
-        const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
-        const rightCenterX = getResponsiveCenterX('right');
-        const rightCenterY = getResponsiveCenterY('right');
-        const clusterRadius = config.clusterRadius * scaleFactor;
-        
-        // Update cluster center position
-        cluster.centerX = rightCenterX + Math.cos(angle) * clusterRadius;
-        cluster.centerY = rightCenterY + Math.sin(angle) * clusterRadius;
-        
-        // Update individual ball positions within the cluster
-        const packSize = config.clusterPackSize * scaleFactor;
-        const pack = d3.pack()
-          .size([packSize, packSize])
-          .padding(2);
-        
-        const root = d3.hierarchy({ children: cluster.balls }).sum(d => d.value);
-        const packedBalls = pack(root).leaves();
-        
-        cluster.balls.forEach((ball, ballIndex) => {
-          const packedBall = packedBalls[ballIndex];
-          ball.x = packedBall.x + cluster.centerX - packSize / 2;
-          ball.y = packedBall.y + cluster.centerY - packSize / 2;
-        });
-        
-        console.log(`🔄 Updated cluster ${i} position: (${cluster.centerX.toFixed(1)}, ${cluster.centerY.toFixed(1)})`);
-      });
-      
-      // Update the visual cluster groups if they exist
-      updateClusterGroups();
-    }
 
     // Setup cluster groups and render circles (hidden initially)
     function setupClusterGroups() {
@@ -1272,47 +1241,6 @@
             .attr("stroke-width", CONFIG.LINE_WIDTH)
             .attr("opacity", 0)
             .style("opacity", 0); // Hidden initially
-        }
-      });
-    }
-
-    // Function to update existing cluster groups when positions change
-    function updateClusterGroups() {
-      // Safety check: only update if clusters exist
-      if (!sixClusters || sixClusters.length === 0) {
-        console.log(`⚠️ Skipping cluster groups update - clusters not yet initialized`);
-        return;
-      }
-      
-      sixClusters.forEach(cluster => {
-        const clusterGroup = sixClusterGroup.select(`.cluster-${cluster.id}`);
-        
-        if (clusterGroup.empty()) return; // Skip if group doesn't exist yet
-        
-        // Update circle positions
-        clusterGroup.selectAll("circle")
-          .transition()
-          .duration(300)
-          .attr("cx", d => d.x)
-          .attr("cy", d => d.y);
-          
-        // Update intra-cluster line positions
-        if (CONFIG.ENABLE_LINES) {
-          const links = [];
-          for (let i = 0; i < cluster.balls.length; i++) {
-            for (let j = i + 1; j < cluster.balls.length; j++) {
-              links.push({ source: cluster.balls[i], target: cluster.balls[j] });
-            }
-          }
-          
-          clusterGroup.selectAll("line")
-            .data(links)
-            .transition()
-            .duration(300)
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
         }
       });
     }

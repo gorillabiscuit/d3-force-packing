@@ -33,7 +33,7 @@
       // Force simulation parameters (Mike Bostock balanced approach)
       CHARGE_STRENGTH: -80, // Moderate repulsion between balls
       PACK_FORCE_STRENGTH: 0.1, // Very weak pack force (reduced to prevent center crashing)
-      COLLISION_PADDING: 4, // Strong collision padding for separation
+      COLLISION_PADDING: 8, // Strong collision padding for separation
       ALPHA_DECAY: 0.05, // Very slow decay for gentle settling
       
       // Visual settings
@@ -162,18 +162,6 @@
         // Phase 3: Update layout parameters after canvas dimensions change
         currentLayoutParams = updateResponsiveLayout();
         console.log(`🎯 Layout parameters updated for ${currentBreakpoint}`);
-        
-        // Phase 4: Update cluster positions with new layout parameters (if clusters exist)
-        try {
-          if (typeof updateClusterPositions === 'function' && typeof sixClusters !== 'undefined' && sixClusters && sixClusters.length > 0) {
-            updateClusterPositions();
-            console.log(`🎯 Cluster positions updated for ${currentBreakpoint}`);
-          } else {
-            console.log(`⚠️ Skipping cluster position update - clusters not yet initialized`);
-          }
-        } catch (error) {
-          console.log(`⚠️ Skipping cluster position update - ${error.message}`);
-        }
       }
     }
     
@@ -216,20 +204,15 @@
           layout: 'stacked', // Vertical stacking for mobile
           // Animation center positioning
           centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Stacked layout positioning (only applies when layout = 'stacked')
-          leftAnimationYOffset: -30, // Y offset for left animation in stacked layout
-          rightAnimationYOffset: 20, // Y offset for right animation in stacked layout
-          leftTitleYOffset: 30, // Y offset for left title in stacked layout
-          rightTitleYOffset: -200, // Y offset for right title in stacked layout
           // Text positioning
           textOffset: 0.8, // Multiplier for text Y position relative to center
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.6, // Multiplier for all left-side balls
-          leftLargeBallMultiplier: 0.5, // Multiplier for large balls vs small balls
+          leftLargeBallMultiplier: 1.8, // Multiplier for large balls vs small balls
           // Right-side cluster sizing
-          clusterBallSize: 6, // Size of individual cluster balls
-          clusterRadius: 300, // Distance from center for cluster centers
-          clusterPackSize: 170, // Size for individual cluster packing
+          clusterBallSize: 8, // Size of individual cluster balls
+          clusterRadius: 80, // Distance from center for cluster centers
+          clusterPackSize: 60, // Size for individual cluster packing
         },
         sm: { 
           maxWidth: '100vw', 
@@ -237,21 +220,16 @@
           padding: 30,
           layout: 'stacked',
           // Animation center positioning
-          centerYOffset: -10, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Stacked layout positioning (only applies when layout = 'stacked')
-          leftAnimationYOffset: 0, // Y offset for left animation in stacked layout
-          rightAnimationYOffset: 40, // Y offset for right animation in stacked layout
-          leftTitleYOffset: 80, // Y offset for left title in stacked layout
-          rightTitleYOffset: 0, // Y offset for right title in stacked layout
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
-          textOffset: 0.4,
+          textOffset: 0.9,
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.7,
           leftLargeBallMultiplier: 0.5,
           // Right-side cluster sizing
-          clusterBallSize: 6,
-          clusterRadius: 230,
-          clusterPackSize: 160,
+          clusterBallSize: 4,
+          clusterRadius: 200,
+          clusterPackSize: 100,
         },
         md: { 
           maxWidth: '95vw', 
@@ -261,14 +239,14 @@
           // Animation center positioning
           centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
-          textOffset: 0.4, // 25% of canvas height below center
+          textOffset: 0.5, // 25% of canvas height below center
           // Left-side animation sizing
-          leftBallSizeMultiplier: 0.7,
+          leftBallSizeMultiplier: 0.8,
           leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
           clusterBallSize: 7,
-          clusterRadius: 200,
-          clusterPackSize: 130,
+          clusterRadius: 180,
+          clusterPackSize: 120,
         },
         lg: { 
           maxWidth: '90vw', 
@@ -292,25 +270,21 @@
           maxHeight: '85vh',
           padding: 60,
           layout: 'dual',
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
           textOffset: 0.42, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 1.0,
-          leftLargeBallMultiplier: .9,
+          leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
-          clusterBallSize: 10,
-          clusterRadius: 220,
-          clusterPackSize: 120,
+          clusterBallSize: 8,
+          clusterRadius: 180,
+          clusterPackSize: 100,
         },
         '2xl': { 
           maxWidth: CONTAINER_MAX_WIDTH,
           maxHeight: '90vh',
           padding: 80,
           layout: 'dual',
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
           textOffset: 0.42, // 25% of canvas height below center
           // Left-side animation sizing
@@ -471,9 +445,9 @@
         layoutParams.padding = 20;
         
       } else if (layout === 'hybrid') {
-        // Tablet: Hybrid layout with equal horizontal space
-        const leftWidth = canvas.width * 0.5;
-        const rightWidth = canvas.width * 0.5;
+        // Tablet: Hybrid layout with some horizontal space
+        const leftWidth = canvas.width * 0.6;
+        const rightWidth = canvas.width * 0.4;
         
         layoutParams.leftCenter = {
           x: leftWidth / 2,
@@ -484,7 +458,7 @@
           y: canvas.height / 2
         };
         layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.9;
-        layoutParams.spacing = canvas.width * 0.5;
+        layoutParams.spacing = canvas.width * 0.6;
         layoutParams.padding = 30;
         
       } else {
@@ -532,16 +506,7 @@
     }
     
     function getResponsiveCenterY(side = 'left') {
-      const baseY = side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
-      const offset = getResponsiveCenterYOffset();
-      
-      // Apply stacked layout specific offsets if in stacked layout
-      if (isStackedLayout()) {
-        const stackedOffset = side === 'left' ? getResponsiveLeftAnimationYOffset() : getResponsiveRightAnimationYOffset();
-        return baseY + offset + stackedOffset;
-      }
-      
-      return baseY + offset;
+      return side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
     }
     
     function getResponsiveScaleFactor() {
@@ -573,33 +538,6 @@
     function getResponsiveLeftLargeBallMultiplier() {
       const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
       return config.leftLargeBallMultiplier;
-    }
-    
-    // Helper function for responsive center Y offset
-    function getResponsiveCenterYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.centerYOffset || 0;
-    }
-    
-    // Helper functions for stacked layout positioning
-    function getResponsiveLeftAnimationYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.leftAnimationYOffset || 0;
-    }
-    
-    function getResponsiveRightAnimationYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.rightAnimationYOffset || 0;
-    }
-    
-    function getResponsiveLeftTitleYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.leftTitleYOffset || 0;
-    }
-    
-    function getResponsiveRightTitleYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.rightTitleYOffset || 0;
     }
     
     // Initialize responsive system after all responsive configs are defined
@@ -966,8 +904,6 @@
       if (isStackedLayout()) {
         // For stacked layouts, use multiplier relative to center
         textOffset = centerY + (centerY * config.textOffset);
-        // Apply stacked layout title offset
-        textOffset += getResponsiveLeftTitleYOffset();
       } else {
         // For dual/hybrid layouts, use percentage of canvas height
         textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
@@ -1008,8 +944,6 @@
       if (isStackedLayout()) {
         // For stacked layouts, use multiplier relative to center
         textOffset = centerY + (centerY * config.textOffset);
-        // Apply stacked layout title offset
-        textOffset += getResponsiveRightTitleYOffset();
       } else {
         // For dual/hybrid layouts, use percentage of canvas height
         textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
@@ -1164,7 +1098,7 @@
     }
 
     // Generate six clusters
-    let sixClusters = createSixClusters();
+    const sixClusters = createSixClusters();
 
     // Pack each cluster independently with responsive sizing
     const scaleFactor = getResponsiveScaleFactor();
@@ -1190,50 +1124,6 @@
 
     // Create separate SVG group for six clusters to avoid conflicts
     const sixClusterGroup = svg.append("g").attr("id", "six-clusters");
-
-    // Function to update cluster positions when layout changes
-    function updateClusterPositions() {
-      // Safety check: only update if clusters exist
-      if (!sixClusters || sixClusters.length === 0) {
-        console.log(`⚠️ Skipping cluster position update - clusters not yet initialized`);
-        return;
-      }
-      
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      const scaleFactor = getResponsiveScaleFactor();
-      
-      sixClusters.forEach((cluster, i) => {
-        // Recalculate cluster center position based on current responsive layout
-        const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
-        const rightCenterX = getResponsiveCenterX('right');
-        const rightCenterY = getResponsiveCenterY('right');
-        const clusterRadius = config.clusterRadius * scaleFactor;
-        
-        // Update cluster center position
-        cluster.centerX = rightCenterX + Math.cos(angle) * clusterRadius;
-        cluster.centerY = rightCenterY + Math.sin(angle) * clusterRadius;
-        
-        // Update individual ball positions within the cluster
-        const packSize = config.clusterPackSize * scaleFactor;
-        const pack = d3.pack()
-          .size([packSize, packSize])
-          .padding(2);
-        
-        const root = d3.hierarchy({ children: cluster.balls }).sum(d => d.value);
-        const packedBalls = pack(root).leaves();
-        
-        cluster.balls.forEach((ball, ballIndex) => {
-          const packedBall = packedBalls[ballIndex];
-          ball.x = packedBall.x + cluster.centerX - packSize / 2;
-          ball.y = packedBall.y + cluster.centerY - packSize / 2;
-        });
-        
-        console.log(`🔄 Updated cluster ${i} position: (${cluster.centerX.toFixed(1)}, ${cluster.centerY.toFixed(1)})`);
-      });
-      
-      // Update the visual cluster groups if they exist
-      updateClusterGroups();
-    }
 
     // Setup cluster groups and render circles (hidden initially)
     function setupClusterGroups() {
@@ -1272,47 +1162,6 @@
             .attr("stroke-width", CONFIG.LINE_WIDTH)
             .attr("opacity", 0)
             .style("opacity", 0); // Hidden initially
-        }
-      });
-    }
-
-    // Function to update existing cluster groups when positions change
-    function updateClusterGroups() {
-      // Safety check: only update if clusters exist
-      if (!sixClusters || sixClusters.length === 0) {
-        console.log(`⚠️ Skipping cluster groups update - clusters not yet initialized`);
-        return;
-      }
-      
-      sixClusters.forEach(cluster => {
-        const clusterGroup = sixClusterGroup.select(`.cluster-${cluster.id}`);
-        
-        if (clusterGroup.empty()) return; // Skip if group doesn't exist yet
-        
-        // Update circle positions
-        clusterGroup.selectAll("circle")
-          .transition()
-          .duration(300)
-          .attr("cx", d => d.x)
-          .attr("cy", d => d.y);
-          
-        // Update intra-cluster line positions
-        if (CONFIG.ENABLE_LINES) {
-          const links = [];
-          for (let i = 0; i < cluster.balls.length; i++) {
-            for (let j = i + 1; j < cluster.balls.length; j++) {
-              links.push({ source: cluster.balls[i], target: cluster.balls[j] });
-            }
-          }
-          
-          clusterGroup.selectAll("line")
-            .data(links)
-            .transition()
-            .duration(300)
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
         }
       });
     }

@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Circle Packing Export</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin: 2rem; }
+    #viz { border: 1px solid #ccc; }
+    button { margin-top: 1rem; padding: 0.5rem 1rem; font-size: 1rem; }
+  </style>
+</head>
+<body>
+ 
+  <svg id="viz" width="1400" height="700"></svg>
+  <br>
+  <button id="downloadBtn">Download SVG</button>
+
+  <script>
+    // === Animation Configuration ===
+    const CONFIG = {
+      // === LEFT SIDE (MAIN ANIMATION) BALL SETTINGS ===
+      BALL_COUNT: 60, // Number of balls in main animation
+      BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
+      
+      // Animation timing
+      BALL_APPEAR_DELAY: 40, // ms between ball appearances
+      FINAL_SETTLEMENT_TIME:10000, // ms for final settlement phase
+      
+      // Force simulation parameters (Mike Bostock balanced approach)
+      CHARGE_STRENGTH: -50, // Moderate repulsion between balls
+      PACK_FORCE_STRENGTH: 0.05, // Very weak pack force (reduced to prevent center crashing)
+      COLLISION_PADDING: 8, // Strong collision padding for separation
+      ALPHA_DECAY: 0.005, // Very slow decay for gentle settling
+      
+      // Visual settings
+      STROKE_WIDTH: 2,
+      LINE_WIDTH: 0.5,
+      LINE_OPACITY: 0.3,
+      STROKE_COLOR: "#0A61B5",
+      LINE_COLOR: "#0A61B5",
+      
+      // Canvas settings
+      CANVAS_SIZE: 1400, // Doubled width for dual layout
+      CENTER_X: 350, // Left side center (for main animation)
+      CENTER_Y: 350, // Vertically centered
+      
+      // === LEFT SIDE (MAIN ANIMATION) SETTINGS ===
+      // Main animation uses the existing CONFIG settings above
+      
+      // === RIGHT SIDE (SIX CLUSTERS) SETTINGS ===
+      NUM_CLUSTERS: 6, // Number of clusters on right side
+      BALLS_PER_CLUSTER: 6, // Fixed number of balls per cluster (all same)
+      RIGHT_CLUSTER_BALL_SIZE: 12, // Fixed size for all right-side balls
+      CLUSTER_RADIUS: 200, // Distance from center for cluster centers
+      CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
+      RIGHT_SIDE_CENTER_X: 1050, // Right side center (for six clusters)
+      RIGHT_SIDE_CENTER_Y: 350, // Vertically centered
+      
+      // Performance settings
+      TARGET_FPS: 60, // Target frames per second
+      FRAME_SKIP: 1, // Update every N frames (1 = every frame)
+      ENABLE_LINES: true, // Toggle: true = show connecting lines, false = hide lines
+      MAX_LINES: 500, // Maximum number of lines to draw
+      
+      // Ball sizing and spacing
+      USE_FIXED_SIZE: false, // Toggle: true = all balls same size, false = variable sizes
+      FIXED_BALL_RADIUS: 8, // Fixed radius for all balls (when USE_FIXED_SIZE = true)
+      MIN_BALL_RADIUS: 1, // Minimum ball radius (when USE_FIXED_SIZE = false)
+      MAX_BALL_RADIUS: 205, // Maximum ball radius (when USE_FIXED_SIZE = false)
+      BALL_PADDING: 10, // Padding between balls
+      
+      // === LEFT SIDE (MAIN ANIMATION) SIZE DISTRIBUTION SETTINGS ===
+      USE_ABSOLUTE_SIZING: true, // Toggle: true = absolute sizes, false = packed sizes
+      LARGE_BALL_COUNT: 9, // Number of large balls in main animation
+      LARGE_BALL_MIN_RADIUS: 10, // Minimum radius for large balls in main animation
+      LARGE_BALL_MAX_RADIUS: 120, // Maximum radius for large balls in main animation
+      SMALL_BALL_MIN_RADIUS: 5, // Minimum radius for small balls in main animation
+      SMALL_BALL_MAX_RADIUS: 15, // Maximum radius for small balls in main animation
+    };
+
+    // === Generate circles with proper circle packing and spacing control ===
+    let packedNodes;
+    
+     if (CONFIG.USE_ABSOLUTE_SIZING) {
+       // Create circles with variable absolute sizes and random positioning
+       // First, create an array of indices and shuffle it to randomize large ball positions
+       const indices = Array.from({ length: CONFIG.BALL_COUNT }, (_, i) => i);
+       const shuffledIndices = indices.sort(() => Math.random() - 0.5);
+       
+       packedNodes = Array.from({ length: CONFIG.BALL_COUNT }, (_, i) => {
+         const isLarge = shuffledIndices[i] < CONFIG.LARGE_BALL_COUNT;
+        
+        // Variable radius within the size category
+        let radius;
+        if (isLarge) {
+          radius = CONFIG.LARGE_BALL_MIN_RADIUS + 
+                   Math.random() * (CONFIG.LARGE_BALL_MAX_RADIUS - CONFIG.LARGE_BALL_MIN_RADIUS);
+        } else {
+          radius = CONFIG.SMALL_BALL_MIN_RADIUS + 
+                   Math.random() * (CONFIG.SMALL_BALL_MAX_RADIUS - CONFIG.SMALL_BALL_MIN_RADIUS);
+        }
+        
+        // Better initial positioning to avoid all starting at center
+        const angle = Math.random() * 2 * Math.PI;
+        const distance = Math.random() * 200 + 50; // Random distance from center (50-250px)
+        const x = CONFIG.CENTER_X + Math.cos(angle) * distance;
+        const y = CONFIG.CENTER_Y + Math.sin(angle) * distance;
+        
+        return {
+          x: x,
+          y: y,
+          r: radius,
+          value: isLarge ? 1 : 0.1 // Large balls get higher value for packing
+        };
+      });
+    } else {
+      // Use D3's pack algorithm (original behavior)
+      const data = { children: Array.from({ length: CONFIG.BALL_COUNT }, () => ({ value: Math.random() })) };
+      
+      const pack = d3.pack()
+        .size([CONFIG.CANVAS_SIZE * 0.8, CONFIG.CANVAS_SIZE * 0.8])
+        .padding(0); // No padding in pack algorithm
+
+      const root = d3.hierarchy(data).sum(d => d.value);
+      packedNodes = pack(root).leaves();
+      
+      // Apply size multiplier and set radius based on mode
+      packedNodes.forEach(node => {
+        node.r *= CONFIG.BALL_SIZE_MULTIPLIER;
+        
+        if (CONFIG.USE_FIXED_SIZE) {
+          // All balls same size
+          node.r = CONFIG.FIXED_BALL_RADIUS;
+        } else {
+          // Variable sizes constrained to min/max bounds
+          node.r = Math.max(CONFIG.MIN_BALL_RADIUS, Math.min(CONFIG.MAX_BALL_RADIUS, node.r));
+        }
+      });
+    }
+    
+    // Position circles appropriately based on sizing mode
+    let nodes;
+    
+    if (CONFIG.USE_ABSOLUTE_SIZING) {
+      // For absolute sizing, start all circles at center and let force simulation position them
+      nodes = packedNodes.map(node => ({
+        ...node,
+        x: CONFIG.CENTER_X,
+        y: CONFIG.CENTER_Y,
+        targetX: CONFIG.CENTER_X,
+        targetY: CONFIG.CENTER_Y,
+        vx: 0,
+        vy: 0
+      }));
+    } else {
+      // For packed sizing, center the packed layout
+      const bounds = d3.extent(packedNodes, d => d.x - d.r);
+      const boundsY = d3.extent(packedNodes, d => d.y - d.r);
+      const minX = bounds[0];
+      const minY = boundsY[0];
+      const maxX = d3.extent(packedNodes, d => d.x + d.r)[1];
+      const maxY = d3.extent(packedNodes, d => d.y + d.r)[1];
+      
+      const layoutWidth = maxX - minX;
+      const layoutHeight = maxY - minY;
+      const offsetX = (CONFIG.CANVAS_SIZE - layoutWidth) / 2 - minX;
+      const offsetY = (CONFIG.CANVAS_SIZE - layoutHeight) / 2 - minY;
+      
+      // Create final nodes with target positions
+      nodes = packedNodes.map(node => ({
+        ...node,
+        x: node.x + offsetX,
+        y: node.y + offsetY,
+        targetX: node.x + offsetX,
+        targetY: node.y + offsetY,
+        vx: 0,
+        vy: 0
+      }));
+    }
+
+    const svg = d3.select("#viz");
+    
+    // === Create separate groups for each visualization ===
+    const mainAnimationGroup = svg.append("g").attr("id", "main-animation");
+
+    // === Animation variables ===
+    let currentNodes = [];
+    let simulation = null;
+    let circles = null;
+    let lines = null;
+    let frameCount = 0;
+    let lastFrameTime = 0;
+    let animationId = null;
+
+
+    // === Force simulation setup ===
+    function createSimulation(nodes) {
+      return d3.forceSimulation(nodes)
+        .force("charge", d3.forceManyBody().strength(CONFIG.CHARGE_STRENGTH))
+        .force("collision", d3.forceCollide().radius(d => d.r + CONFIG.COLLISION_PADDING))
+        .force("pack", packForce(nodes))
+        .force("center", weakCenterForce()) // Custom weak center force
+        .alphaDecay(CONFIG.ALPHA_DECAY)
+        .on("tick", updateVisualization)
+        .velocityDecay(0.4);
+    }
+
+    // === Custom weak center force (Mike Bostock approach) ===
+    function weakCenterForce() {
+      return function() {
+        const centerX = CONFIG.CENTER_X;
+        const centerY = CONFIG.CENTER_Y;
+        const strength = 0.01; // Very weak force
+        
+        currentNodes.forEach(node => {
+          const dx = centerX - node.x;
+          const dy = centerY - node.y;
+          
+          // Apply force everywhere to prevent center hole
+          node.vx += dx * strength;
+          node.vy += dy * strength;
+        });
+      };
+    }
+
+    // === Custom force to move toward packed positions (with progressive weakening) ===
+    function packForce(nodes) {
+      return function() {
+        // Progressive weakening: start strong, end weak
+        const alpha = simulation ? simulation.alpha() : 1;
+        const strength = CONFIG.PACK_FORCE_STRENGTH * alpha; // Weaken over time
+        
+        nodes.forEach(node => {
+          if (node.targetX !== undefined && node.targetY !== undefined) {
+            const dx = node.targetX - node.x;
+            const dy = node.targetY - node.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            
+            // Only apply force if ball is far from target and simulation is active
+            if (distance > 20 && alpha > 0.1) {
+              node.vx += dx * strength;
+              node.vy += dy * strength;
+            }
+          }
+        });
+      };
+    }
+
+    // === Optimized visualization update with frame rate limiting ===
+    function updateVisualization() {
+      frameCount++;
+      
+      // Skip frames for better performance
+      if (frameCount % CONFIG.FRAME_SKIP !== 0) return;
+      
+      const now = performance.now();
+      const deltaTime = now - lastFrameTime;
+      
+      // Target 60 FPS = ~16.67ms per frame
+      if (deltaTime < 1000 / CONFIG.TARGET_FPS) return;
+      
+      lastFrameTime = now;
+      
+      // Update circles (always needed)
+      if (circles) {
+        circles
+          .attr("cx", d => d.x)
+          .attr("cy", d => d.y);
+      }
+      
+      // Update lines only if enabled and not too many
+      if (CONFIG.ENABLE_LINES && lines && lines.size() <= CONFIG.MAX_LINES) {
+        lines
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y);
+      }
+    }
+
+    // === Add new ball and trigger simulation ===
+    function addBall() {
+      if (currentNodes.length >= nodes.length) {
+        // All balls added, start final settlement phase
+        startFinalSettlement();
+        return;
+      }
+
+      // Add new node at center with target packed position
+      const newNode = {
+        ...nodes[currentNodes.length],
+        x: CONFIG.CENTER_X, // start at center
+        y: CONFIG.CENTER_Y, // start at center
+        targetX: nodes[currentNodes.length].x, // packed position
+        targetY: nodes[currentNodes.length].y, // packed position
+        vx: 0,
+        vy: 0
+      };
+      currentNodes.push(newNode);
+
+      // Update target positions for all existing nodes to their packed positions
+      currentNodes.forEach((node, i) => {
+        node.targetX = nodes[i].x;
+        node.targetY = nodes[i].y;
+      });
+
+      // Update circles
+      circles = mainAnimationGroup.selectAll("circle")
+        .data(currentNodes)
+        .join("circle")
+        .attr("cx", d => d.x)
+        .attr("cy", d => d.y)
+        .attr("r", d => d.r)
+        .attr("fill", "none")
+        .attr("stroke", CONFIG.STROKE_COLOR)
+        .attr("stroke-width", CONFIG.STROKE_WIDTH);
+
+      // Update lines (connect new ball to all existing balls) - only if enabled
+      if (CONFIG.ENABLE_LINES) {
+        const links = [];
+        const maxLinks = Math.min(CONFIG.MAX_LINES, (currentNodes.length * (currentNodes.length - 1)) / 2);
+        
+        // Create links more efficiently
+        for (let i = 0; i < currentNodes.length && links.length < maxLinks; i++) {
+          for (let j = i + 1; j < currentNodes.length && links.length < maxLinks; j++) {
+            links.push({ source: currentNodes[i], target: currentNodes[j] });
+          }
+        }
+
+        lines = mainAnimationGroup.selectAll("line")
+          .data(links)
+          .join("line")
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y)
+          .attr("stroke", CONFIG.LINE_COLOR)
+          .attr("stroke-width", CONFIG.LINE_WIDTH)
+          .attr("opacity", CONFIG.LINE_OPACITY);
+      }
+
+      // Create new simulation with updated nodes
+      if (simulation) simulation.stop();
+      simulation = createSimulation(currentNodes);
+      
+      // Run simulation for a bit, then add next ball
+      simulation.alpha(1).restart();
+      
+      setTimeout(() => {
+        simulation.stop();
+        addBall();
+      }, CONFIG.BALL_APPEAR_DELAY);
+    }
+
+    // === Final settlement phase (Mike Bostock approach) ===
+    function startFinalSettlement() {
+      console.log("Starting final settlement phase...");
+      
+      // Create final simulation with all nodes
+      if (simulation) simulation.stop();
+      simulation = createSimulation(currentNodes);
+      
+      // Remove pack force for natural settling
+      simulation.force("pack", null);
+      
+      // Use moderate energy for gentle final settling
+      simulation.alpha(0.3).restart();
+      
+      // Let it run for configured time for final settlement
+      setTimeout(() => {
+        if (simulation) simulation.stop();
+        console.log("Final settlement complete!");
+        leftAnimationComplete = true;
+        
+        // Show left side text and start right animation after delay
+        showLeftSideText();
+        setTimeout(() => {
+          startRightSideAnimation();
+        }, 1000); // 1 second delay
+      }, CONFIG.FINAL_SETTLEMENT_TIME);
+    }
+
+    // === Performance monitoring ===
+    function logPerformance() {
+      const fps = Math.round(1000 / (performance.now() - lastFrameTime));
+      console.log(`FPS: ${fps}, Balls: ${currentNodes.length}, Lines: ${lines ? lines.size() : 0}`);
+    }
+
+    // === Start the animation ===
+    addBall();
+    
+    // Log performance every 2 seconds
+    setInterval(logPerformance, 2000);
+
+    // === Animation State Management ===
+    let leftAnimationComplete = false;
+    let rightAnimationComplete = false;
+
+    // === Six-Cluster Layout (Right Side) ===
+    function createSixClusters() {
+      const clusters = [];
+      let ballId = CONFIG.BALL_COUNT; // Start ID after main animation balls
+      
+      for (let i = 0; i < CONFIG.NUM_CLUSTERS; i++) {
+        // Fixed number of balls per cluster (all clusters same)
+        const numBalls = CONFIG.BALLS_PER_CLUSTER;
+        
+        // Create balls for this cluster with fixed size
+        const clusterBalls = Array.from({ length: numBalls }, () => {
+          return {
+            id: ballId++,
+            value: 1, // Fixed value for uniform size
+            clusterId: i,
+            r: CONFIG.RIGHT_CLUSTER_BALL_SIZE // Fixed radius for all right-side balls
+          };
+        });
+        
+        // Calculate cluster center position (radial layout around right side center)
+        const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
+        const centerX = CONFIG.RIGHT_SIDE_CENTER_X + Math.cos(angle) * CONFIG.CLUSTER_RADIUS;
+        const centerY = CONFIG.RIGHT_SIDE_CENTER_Y + Math.sin(angle) * CONFIG.CLUSTER_RADIUS;
+        
+        clusters.push({
+          id: i,
+          balls: clusterBalls,
+          centerX: centerX,
+          centerY: centerY
+        });
+      }
+      
+      return clusters;
+    }
+
+    // Generate six clusters
+    const sixClusters = createSixClusters();
+
+    // Pack each cluster independently with fixed ball sizes
+    sixClusters.forEach(cluster => {
+      const pack = d3.pack()
+        .size([CONFIG.CLUSTER_PACK_SIZE, CONFIG.CLUSTER_PACK_SIZE])
+        .padding(2);
+      
+      const root = d3.hierarchy({ children: cluster.balls }).sum(d => d.value);
+      const packedBalls = pack(root).leaves();
+      
+      // Update cluster balls with packed positions (keep fixed radius)
+      packedBalls.forEach((packedBall, i) => {
+        const ball = cluster.balls[i];
+        ball.x = packedBall.x + cluster.centerX - CONFIG.CLUSTER_PACK_SIZE / 2;
+        ball.y = packedBall.y + cluster.centerY - CONFIG.CLUSTER_PACK_SIZE / 2;
+        // Keep the fixed radius we set earlier
+        // ball.r remains CONFIG.RIGHT_CLUSTER_BALL_SIZE
+      });
+    });
+
+    // Create separate SVG group for six clusters to avoid conflicts
+    const sixClusterGroup = svg.append("g").attr("id", "six-clusters");
+
+    // Render six clusters
+    function renderSixClusters() {
+      // Create circles for each cluster
+      sixClusters.forEach(cluster => {
+        const clusterGroup = sixClusterGroup.append("g").attr("class", `cluster-${cluster.id}`);
+        
+        clusterGroup.selectAll("circle")
+          .data(cluster.balls)
+          .join("circle")
+          .attr("cx", d => d.x)
+          .attr("cy", d => d.y)
+          .attr("r", d => d.r)
+          .attr("fill", "none")
+          .attr("stroke", CONFIG.STROKE_COLOR)
+          .attr("stroke-width", CONFIG.STROKE_WIDTH);
+        
+        // Draw intra-cluster lines
+        if (CONFIG.ENABLE_LINES) {
+          const links = [];
+          for (let i = 0; i < cluster.balls.length; i++) {
+            for (let j = i + 1; j < cluster.balls.length; j++) {
+              links.push({ source: cluster.balls[i], target: cluster.balls[j] });
+            }
+          }
+          
+          clusterGroup.selectAll("line")
+            .data(links)
+            .join("line")
+            .attr("x1", d => d.source.x)
+            .attr("y1", d => d.source.y)
+            .attr("x2", d => d.target.x)
+            .attr("y2", d => d.target.y)
+            .attr("stroke", CONFIG.LINE_COLOR)
+            .attr("stroke-width", CONFIG.LINE_WIDTH)
+            .attr("opacity", CONFIG.LINE_OPACITY);
+        }
+      });
+      
+      // Draw inter-cluster lines
+      if (CONFIG.ENABLE_LINES) {
+        const interLinks = [];
+        for (let i = 0; i < CONFIG.NUM_CLUSTERS; i++) {
+          for (let j = i + 1; j < CONFIG.NUM_CLUSTERS; j++) {
+            interLinks.push({ 
+              source: { x: sixClusters[i].centerX, y: sixClusters[i].centerY },
+              target: { x: sixClusters[j].centerX, y: sixClusters[j].centerY }
+            });
+          }
+        }
+        
+        sixClusterGroup.selectAll("line.inter-cluster")
+          .data(interLinks)
+          .join("line")
+          .attr("class", "inter-cluster")
+          .attr("x1", d => d.source.x)
+          .attr("y1", d => d.source.y)
+          .attr("x2", d => d.target.x)
+          .attr("y2", d => d.target.y)
+          .attr("stroke", CONFIG.STROKE_COLOR)
+          .attr("stroke-width", CONFIG.LINE_WIDTH * 2)
+          .attr("opacity", CONFIG.LINE_OPACITY * 0.8);
+      }
+    }
+
+    // Debug: Log cluster positions
+    console.log(`Six clusters created: ${sixClusters.length} clusters, ${CONFIG.BALLS_PER_CLUSTER} balls each, size: ${CONFIG.RIGHT_CLUSTER_BALL_SIZE}px`);
+    sixClusters.forEach((cluster, i) => {
+      console.log(`Cluster ${i}: center (${cluster.centerX}, ${cluster.centerY}), balls: ${cluster.balls.length}`);
+      if (cluster.balls.length > 0) {
+        console.log(`  First ball: x=${cluster.balls[0].x}, y=${cluster.balls[0].y}, r=${cluster.balls[0].r}`);
+      }
+    });
+
+    // Debug markers removed - groups now provide proper isolation
+
+    // Render the six clusters
+    renderSixClusters();
+
+    // === Download logic ===
+    document.getElementById("downloadBtn").addEventListener("click", () => {
+      const serializer = new XMLSerializer();
+      const svgNode = document.getElementById("viz");
+      const source = serializer.serializeToString(svgNode);
+
+      const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "circle-packing.svg";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    });
+  </script>
+</body>
+</html>

@@ -261,14 +261,14 @@
           // Animation center positioning
           centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
-          textOffset: 0.4, // 25% of canvas height below center
+          textOffset: 0.5, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.7,
           leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
           clusterBallSize: 7,
-          clusterRadius: 200,
-          clusterPackSize: 130,
+          clusterRadius: 220,
+          clusterPackSize: 150,
         },
         lg: { 
           maxWidth: '90vw', 
@@ -298,11 +298,11 @@
           textOffset: 0.42, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 1.0,
-          leftLargeBallMultiplier: .9,
+          leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
-          clusterBallSize: 10,
-          clusterRadius: 220,
-          clusterPackSize: 120,
+          clusterBallSize: 8,
+          clusterRadius: 180,
+          clusterPackSize: 100,
         },
         '2xl': { 
           maxWidth: CONTAINER_MAX_WIDTH,
@@ -471,9 +471,9 @@
         layoutParams.padding = 20;
         
       } else if (layout === 'hybrid') {
-        // Tablet: Hybrid layout with equal horizontal space
-        const leftWidth = canvas.width * 0.5;
-        const rightWidth = canvas.width * 0.5;
+        // Tablet: Hybrid layout with some horizontal space
+        const leftWidth = canvas.width * 0.6;
+        const rightWidth = canvas.width * 0.4;
         
         layoutParams.leftCenter = {
           x: leftWidth / 2,
@@ -484,7 +484,7 @@
           y: canvas.height / 2
         };
         layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.9;
-        layoutParams.spacing = canvas.width * 0.5;
+        layoutParams.spacing = canvas.width * 0.6;
         layoutParams.padding = 30;
         
       } else {

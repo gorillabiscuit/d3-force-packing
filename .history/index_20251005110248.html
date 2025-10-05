@@ -15,7 +15,7 @@
 </head>
 <body>
  
-  <svg id="viz"></svg>
+  <svg id="viz" width="1400" height="700"></svg>
   <br>
   <button id="downloadBtn">Download SVG</button>
 
@@ -27,14 +27,14 @@
       BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
       
       // Animation timing
-      BALL_APPEAR_DELAY: 10, // ms between ball appearances
-      FINAL_SETTLEMENT_TIME:6000, // ms for final settlement phase
+      BALL_APPEAR_DELAY: 40, // ms between ball appearances
+      FINAL_SETTLEMENT_TIME:8000, // ms for final settlement phase
       
       // Force simulation parameters (Mike Bostock balanced approach)
-      CHARGE_STRENGTH: -80, // Moderate repulsion between balls
-      PACK_FORCE_STRENGTH: 0.1, // Very weak pack force (reduced to prevent center crashing)
-      COLLISION_PADDING: 4, // Strong collision padding for separation
-      ALPHA_DECAY: 0.05, // Very slow decay for gentle settling
+      CHARGE_STRENGTH: -50, // Moderate repulsion between balls
+      PACK_FORCE_STRENGTH: 0.05, // Very weak pack force (reduced to prevent center crashing)
+      COLLISION_PADDING: 8, // Strong collision padding for separation
+      ALPHA_DECAY: 0.005, // Very slow decay for gentle settling
       
       // Visual settings
       STROKE_WIDTH: 2,
@@ -43,10 +43,10 @@
       STROKE_COLOR: "#0A61B5",
       LINE_COLOR: "#0A61B5",
       
-      // Canvas settings (will be overridden by responsive system)
-      CANVAS_SIZE: 1400, // Reference size for scaling calculations
-      CENTER_X: 350, // Reference left side center (will be replaced by responsive)
-      CENTER_Y: 320, // Reference center Y (will be replaced by responsive)
+      // Canvas settings
+      CANVAS_SIZE: 1400, // Doubled width for dual layout
+      CENTER_X: 350, // Left side center (for main animation)
+      CENTER_Y: 320, // Moved up 30px (was 350)
       
       // === LEFT SIDE (MAIN ANIMATION) SETTINGS ===
       // Main animation uses the existing CONFIG settings above
@@ -57,8 +57,8 @@
       RIGHT_CLUSTER_BALL_SIZE: 12, // Fixed size for all right-side balls
       CLUSTER_RADIUS: 200, // Distance from center for cluster centers
       CLUSTER_PACK_SIZE: 120, // Size for individual cluster packing
-      RIGHT_SIDE_CENTER_X: 1050, // Reference right side center (will be replaced by responsive)
-      RIGHT_SIDE_CENTER_Y: 320, // Reference right side center Y (will be replaced by responsive)
+      RIGHT_SIDE_CENTER_X: 1050, // Right side center (for six clusters)
+      RIGHT_SIDE_CENTER_Y: 320, // Moved up 30px (was 350)
       
       // Performance settings
       TARGET_FPS: 60, // Target frames per second
@@ -94,7 +94,7 @@
     };
     
     // Container max-width constraints
-    const CONTAINER_MAX_WIDTH = 1600; // Increased to allow 2xl breakpoint (1536px) to trigger
+    const CONTAINER_MAX_WIDTH = 1400;
     
     // Current responsive state
     let currentBreakpoint = 'xl'; // Default to desktop
@@ -158,22 +158,6 @@
       if (breakpointChanged || sizeChanged) {
         currentCanvasDimensions = updateCanvasDimensions();
         console.log(`🎯 Canvas updated for ${currentBreakpoint}: ${currentCanvasDimensions.width}x${currentCanvasDimensions.height} (${currentCanvasDimensions.layout})`);
-        
-        // Phase 3: Update layout parameters after canvas dimensions change
-        currentLayoutParams = updateResponsiveLayout();
-        console.log(`🎯 Layout parameters updated for ${currentBreakpoint}`);
-        
-        // Phase 4: Update cluster positions with new layout parameters (if clusters exist)
-        try {
-          if (typeof updateClusterPositions === 'function' && typeof sixClusters !== 'undefined' && sixClusters && sixClusters.length > 0) {
-            updateClusterPositions();
-            console.log(`🎯 Cluster positions updated for ${currentBreakpoint}`);
-          } else {
-            console.log(`⚠️ Skipping cluster position update - clusters not yet initialized`);
-          }
-        } catch (error) {
-          console.log(`⚠️ Skipping cluster position update - ${error.message}`);
-        }
       }
     }
     
@@ -200,6 +184,47 @@
       console.log(`🎯 Responsive monitoring initialized - Current: ${currentBreakpoint} (${containerWidth}px)`);
     }
     
+    // Initialize responsive system
+    setupResponsiveMonitoring();
+    
+    // Add visual debug indicator (Phase 1 testing)
+    function addResponsiveDebugIndicator() {
+      const debugDiv = document.createElement('div');
+      debugDiv.id = 'responsive-debug';
+      debugDiv.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        background: rgba(0,0,0,0.8);
+        color: white;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 1000;
+        pointer-events: none;
+      `;
+      document.body.appendChild(debugDiv);
+      
+      // Update debug indicator
+      function updateDebugIndicator() {
+        debugDiv.textContent = `${currentBreakpoint} | ${containerWidth}px | ${viewportWidth}x${viewportHeight}`;
+      }
+      
+      // Update on responsive changes
+      const originalHandleChange = handleResponsiveChange;
+      handleResponsiveChange = function(breakpointChanged, sizeChanged) {
+        originalHandleChange(breakpointChanged, sizeChanged);
+        updateDebugIndicator();
+      };
+      
+      // Initial update
+      updateDebugIndicator();
+    }
+    
+    // Add debug indicator
+    addResponsiveDebugIndicator();
+    
     // === RESPONSIVE CANVAS SIZING SYSTEM (Phase 2) ===
     
     // Responsive canvas configuration
@@ -213,113 +238,37 @@
           maxWidth: '100vw', 
           maxHeight: '60vh',
           padding: 20,
-          layout: 'stacked', // Vertical stacking for mobile
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Stacked layout positioning (only applies when layout = 'stacked')
-          leftAnimationYOffset: -30, // Y offset for left animation in stacked layout
-          rightAnimationYOffset: 20, // Y offset for right animation in stacked layout
-          leftTitleYOffset: 30, // Y offset for left title in stacked layout
-          rightTitleYOffset: -200, // Y offset for right title in stacked layout
-          // Text positioning
-          textOffset: 0.8, // Multiplier for text Y position relative to center
-          // Left-side animation sizing
-          leftBallSizeMultiplier: 0.6, // Multiplier for all left-side balls
-          leftLargeBallMultiplier: 0.5, // Multiplier for large balls vs small balls
-          // Right-side cluster sizing
-          clusterBallSize: 6, // Size of individual cluster balls
-          clusterRadius: 300, // Distance from center for cluster centers
-          clusterPackSize: 170, // Size for individual cluster packing
+          layout: 'stacked' // Vertical stacking for mobile
         },
         sm: { 
           maxWidth: '100vw', 
           maxHeight: '70vh',
           padding: 30,
-          layout: 'stacked',
-          // Animation center positioning
-          centerYOffset: -10, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Stacked layout positioning (only applies when layout = 'stacked')
-          leftAnimationYOffset: 0, // Y offset for left animation in stacked layout
-          rightAnimationYOffset: 40, // Y offset for right animation in stacked layout
-          leftTitleYOffset: 80, // Y offset for left title in stacked layout
-          rightTitleYOffset: 0, // Y offset for right title in stacked layout
-          // Text positioning
-          textOffset: 0.4,
-          // Left-side animation sizing
-          leftBallSizeMultiplier: 0.7,
-          leftLargeBallMultiplier: 0.5,
-          // Right-side cluster sizing
-          clusterBallSize: 6,
-          clusterRadius: 230,
-          clusterPackSize: 160,
+          layout: 'stacked'
         },
         md: { 
           maxWidth: '95vw', 
           maxHeight: '75vh',
           padding: 40,
-          layout: 'hybrid', // Hybrid layout for tablets
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Text positioning
-          textOffset: 0.4, // 25% of canvas height below center
-          // Left-side animation sizing
-          leftBallSizeMultiplier: 0.7,
-          leftLargeBallMultiplier: 0.7,
-          // Right-side cluster sizing
-          clusterBallSize: 7,
-          clusterRadius: 200,
-          clusterPackSize: 130,
+          layout: 'hybrid' // Hybrid layout for tablets
         },
         lg: { 
           maxWidth: '90vw', 
           maxHeight: '80vh',
           padding: 50,
-          layout: 'dual', // Side-by-side for laptops
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Text positioning
-          textOffset: 0.43, // 25% of canvas height below center
-          // Left-side animation sizing
-          leftBallSizeMultiplier: 0.7,
-          leftLargeBallMultiplier: 0.8,
-          // Right-side cluster sizing
-          clusterBallSize: 8,
-          clusterRadius: 180,
-          clusterPackSize: 110,
+          layout: 'dual' // Side-by-side for laptops
         },
         xl: { 
           maxWidth: '85vw', 
           maxHeight: '85vh',
           padding: 60,
-          layout: 'dual',
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Text positioning
-          textOffset: 0.42, // 25% of canvas height below center
-          // Left-side animation sizing
-          leftBallSizeMultiplier: 1.0,
-          leftLargeBallMultiplier: .9,
-          // Right-side cluster sizing
-          clusterBallSize: 10,
-          clusterRadius: 220,
-          clusterPackSize: 120,
+          layout: 'dual'
         },
         '2xl': { 
           maxWidth: CONTAINER_MAX_WIDTH,
           maxHeight: '90vh',
           padding: 80,
-          layout: 'dual',
-          // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
-          // Text positioning
-          textOffset: 0.42, // 25% of canvas height below center
-          // Left-side animation sizing
-          leftBallSizeMultiplier: 1.1,
-          leftLargeBallMultiplier: 1,
-          // Right-side cluster sizing
-          clusterBallSize: 10, // Slightly larger for 2xl screens
-          clusterRadius: 180, // Increased for larger screens
-          clusterPackSize: 100, // Increased for larger screens
+          layout: 'dual'
         }
       }
     };
@@ -388,222 +337,6 @@
     
     // Initial canvas sizing
     let currentCanvasDimensions = updateCanvasDimensions();
-    
-    // Add visual debug indicator (Phase 1 & 2 testing)
-    function addResponsiveDebugIndicator() {
-      const debugDiv = document.createElement('div');
-      debugDiv.id = 'responsive-debug';
-      debugDiv.style.cssText = `
-        position: fixed;
-        top: 10px;
-        right: 10px;
-        background: rgba(0,0,0,0.8);
-        color: white;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-family: monospace;
-        font-size: 12px;
-        z-index: 1000;
-        pointer-events: none;
-      `;
-      document.body.appendChild(debugDiv);
-      
-      // Update debug indicator
-      function updateDebugIndicator() {
-        const canvasInfo = currentCanvasDimensions ? 
-          `${currentCanvasDimensions.width}x${currentCanvasDimensions.height}` : 'calculating...';
-        debugDiv.textContent = `${currentBreakpoint} | ${canvasInfo} | ${viewportWidth}x${viewportHeight}`;
-      }
-      
-      // Update on responsive changes
-      const originalHandleChange = handleResponsiveChange;
-      handleResponsiveChange = function(breakpointChanged, sizeChanged) {
-        originalHandleChange(breakpointChanged, sizeChanged);
-        updateDebugIndicator();
-      };
-      
-      // Initial update
-      updateDebugIndicator();
-    }
-    
-    // Add debug indicator
-    addResponsiveDebugIndicator();
-    
-    // === RESPONSIVE LAYOUT CALCULATION FUNCTIONS (Phase 3) ===
-    
-    // Calculate responsive layout parameters
-    function calculateResponsiveLayout() {
-      const canvas = currentCanvasDimensions;
-      const layout = canvas.layout;
-      
-      let layoutParams = {
-        // Canvas dimensions
-        canvasWidth: canvas.width,
-        canvasHeight: canvas.height,
-        
-        // Layout type
-        layout: layout,
-        
-        // Centers and spacing
-        leftCenter: { x: 0, y: 0 },
-        rightCenter: { x: 0, y: 0 },
-        
-        // Scaling factors
-        scaleFactor: 1,
-        
-        // Layout-specific parameters
-        spacing: 0,
-        padding: 0
-      };
-      
-      if (layout === 'stacked') {
-        // Mobile: Stack vertically
-        layoutParams.leftCenter = {
-          x: canvas.width / 2,
-          y: canvas.height * 0.3 // Top third for main animation
-        };
-        layoutParams.rightCenter = {
-          x: canvas.width / 2,
-          y: canvas.height * 0.7 // Bottom third for six clusters
-        };
-        layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.8;
-        layoutParams.spacing = canvas.height * 0.4; // Vertical spacing
-        layoutParams.padding = 20;
-        
-      } else if (layout === 'hybrid') {
-        // Tablet: Hybrid layout with equal horizontal space
-        const leftWidth = canvas.width * 0.5;
-        const rightWidth = canvas.width * 0.5;
-        
-        layoutParams.leftCenter = {
-          x: leftWidth / 2,
-          y: canvas.height / 2
-        };
-        layoutParams.rightCenter = {
-          x: leftWidth + (rightWidth / 2),
-          y: canvas.height / 2
-        };
-        layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700) * 0.9;
-        layoutParams.spacing = canvas.width * 0.5;
-        layoutParams.padding = 30;
-        
-      } else {
-        // Desktop: Dual layout (lg, xl, 2xl)
-        layoutParams.leftCenter = {
-          x: canvas.width / 4, // Left quarter
-          y: canvas.height / 2
-        };
-        layoutParams.rightCenter = {
-          x: (canvas.width * 3) / 4, // Right quarter
-          y: canvas.height / 2
-        };
-        layoutParams.scaleFactor = Math.min(canvas.width / 1400, canvas.height / 700);
-        layoutParams.spacing = canvas.width / 2;
-        layoutParams.padding = 40;
-      }
-      
-      // Ensure minimum scale factor
-      layoutParams.scaleFactor = Math.max(layoutParams.scaleFactor, 0.3);
-      
-      console.log(`📐 Layout calculated for ${currentBreakpoint}:`, {
-        layout: layoutParams.layout,
-        leftCenter: layoutParams.leftCenter,
-        rightCenter: layoutParams.rightCenter,
-        scaleFactor: layoutParams.scaleFactor.toFixed(2),
-        spacing: layoutParams.spacing.toFixed(0)
-      });
-      
-      return layoutParams;
-    }
-    
-    // Get current responsive layout parameters
-    let currentLayoutParams = calculateResponsiveLayout();
-    
-    // Update layout parameters when responsive state changes
-    function updateResponsiveLayout() {
-      currentLayoutParams = calculateResponsiveLayout();
-      console.log(`🎯 Layout updated for ${currentBreakpoint} breakpoint`);
-      return currentLayoutParams;
-    }
-    
-    // Helper functions for responsive positioning
-    function getResponsiveCenterX(side = 'left') {
-      return side === 'left' ? currentLayoutParams.leftCenter.x : currentLayoutParams.rightCenter.x;
-    }
-    
-    function getResponsiveCenterY(side = 'left') {
-      const baseY = side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
-      const offset = getResponsiveCenterYOffset();
-      
-      // Apply stacked layout specific offsets if in stacked layout
-      if (isStackedLayout()) {
-        const stackedOffset = side === 'left' ? getResponsiveLeftAnimationYOffset() : getResponsiveRightAnimationYOffset();
-        return baseY + offset + stackedOffset;
-      }
-      
-      return baseY + offset;
-    }
-    
-    function getResponsiveScaleFactor() {
-      return currentLayoutParams.scaleFactor;
-    }
-    
-    function getResponsiveSpacing() {
-      return currentLayoutParams.spacing;
-    }
-    
-    function getResponsivePadding() {
-      return currentLayoutParams.padding;
-    }
-    
-    function isStackedLayout() {
-      return currentLayoutParams.layout === 'stacked';
-    }
-    
-    function isDualLayout() {
-      return currentLayoutParams.layout === 'dual';
-    }
-    
-    // Helper functions for responsive left-side animation sizing
-    function getResponsiveLeftBallSizeMultiplier() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.leftBallSizeMultiplier;
-    }
-    
-    function getResponsiveLeftLargeBallMultiplier() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.leftLargeBallMultiplier;
-    }
-    
-    // Helper function for responsive center Y offset
-    function getResponsiveCenterYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.centerYOffset || 0;
-    }
-    
-    // Helper functions for stacked layout positioning
-    function getResponsiveLeftAnimationYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.leftAnimationYOffset || 0;
-    }
-    
-    function getResponsiveRightAnimationYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.rightAnimationYOffset || 0;
-    }
-    
-    function getResponsiveLeftTitleYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.leftTitleYOffset || 0;
-    }
-    
-    function getResponsiveRightTitleYOffset() {
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      return config.rightTitleYOffset || 0;
-    }
-    
-    // Initialize responsive system after all responsive configs are defined
-    setupResponsiveMonitoring();
 
     // === Generate circles with proper circle packing and spacing control ===
     let packedNodes;
@@ -617,28 +350,21 @@
        packedNodes = Array.from({ length: CONFIG.BALL_COUNT }, (_, i) => {
          const isLarge = shuffledIndices[i] < CONFIG.LARGE_BALL_COUNT;
         
-        // Variable radius within the size category with responsive multipliers
-        let baseRadius;
+        // Variable radius within the size category
+        let radius;
         if (isLarge) {
-          baseRadius = CONFIG.LARGE_BALL_MIN_RADIUS + 
-                      Math.random() * (CONFIG.LARGE_BALL_MAX_RADIUS - CONFIG.LARGE_BALL_MIN_RADIUS);
+          radius = CONFIG.LARGE_BALL_MIN_RADIUS + 
+                   Math.random() * (CONFIG.LARGE_BALL_MAX_RADIUS - CONFIG.LARGE_BALL_MIN_RADIUS);
         } else {
-          baseRadius = CONFIG.SMALL_BALL_MIN_RADIUS + 
-                      Math.random() * (CONFIG.SMALL_BALL_MAX_RADIUS - CONFIG.SMALL_BALL_MIN_RADIUS);
+          radius = CONFIG.SMALL_BALL_MIN_RADIUS + 
+                   Math.random() * (CONFIG.SMALL_BALL_MAX_RADIUS - CONFIG.SMALL_BALL_MIN_RADIUS);
         }
-        
-        // Apply responsive sizing multipliers
-        const sizeMultiplier = getResponsiveLeftBallSizeMultiplier();
-        const largeMultiplier = isLarge ? getResponsiveLeftLargeBallMultiplier() : 1;
-        const radius = baseRadius * sizeMultiplier * largeMultiplier;
         
         // Better initial positioning to avoid all starting at center
         const angle = Math.random() * 2 * Math.PI;
         const distance = Math.random() * 200 + 50; // Random distance from center (50-250px)
-        const centerX = getResponsiveCenterX('left');
-        const centerY = getResponsiveCenterY('left');
-        const x = centerX + Math.cos(angle) * distance;
-        const y = centerY + Math.sin(angle) * distance;
+        const x = CONFIG.CENTER_X + Math.cos(angle) * distance;
+        const y = CONFIG.CENTER_Y + Math.sin(angle) * distance;
         
         return {
           x: x,
@@ -658,20 +384,16 @@
     const root = d3.hierarchy(data).sum(d => d.value);
       packedNodes = pack(root).leaves();
       
-      // Apply size multiplier and set radius based on mode with responsive multipliers
+      // Apply size multiplier and set radius based on mode
       packedNodes.forEach(node => {
         node.r *= CONFIG.BALL_SIZE_MULTIPLIER;
         
-        // Apply responsive sizing multiplier
-        const sizeMultiplier = getResponsiveLeftBallSizeMultiplier();
-        node.r *= sizeMultiplier;
-        
         if (CONFIG.USE_FIXED_SIZE) {
           // All balls same size
-          node.r = CONFIG.FIXED_BALL_RADIUS * sizeMultiplier;
+          node.r = CONFIG.FIXED_BALL_RADIUS;
         } else {
           // Variable sizes constrained to min/max bounds
-          node.r = Math.max(CONFIG.MIN_BALL_RADIUS * sizeMultiplier, Math.min(CONFIG.MAX_BALL_RADIUS * sizeMultiplier, node.r));
+          node.r = Math.max(CONFIG.MIN_BALL_RADIUS, Math.min(CONFIG.MAX_BALL_RADIUS, node.r));
         }
       });
     }
@@ -681,19 +403,17 @@
     
     if (CONFIG.USE_ABSOLUTE_SIZING) {
       // For absolute sizing, start all circles at center and let force simulation position them
-      const centerX = getResponsiveCenterX('left');
-      const centerY = getResponsiveCenterY('left');
       nodes = packedNodes.map(node => ({
         ...node,
-        x: centerX,
-        y: centerY,
-        targetX: centerX,
-        targetY: centerY,
+        x: CONFIG.CENTER_X,
+        y: CONFIG.CENTER_Y,
+        targetX: CONFIG.CENTER_X,
+        targetY: CONFIG.CENTER_Y,
         vx: 0,
         vy: 0
       }));
     } else {
-      // For packed sizing, center the packed layout using responsive centers
+      // For packed sizing, center the packed layout
       const bounds = d3.extent(packedNodes, d => d.x - d.r);
       const boundsY = d3.extent(packedNodes, d => d.y - d.r);
       const minX = bounds[0];
@@ -703,10 +423,8 @@
       
       const layoutWidth = maxX - minX;
       const layoutHeight = maxY - minY;
-      const centerX = getResponsiveCenterX('left');
-      const centerY = getResponsiveCenterY('left');
-      const offsetX = centerX - (minX + layoutWidth / 2);
-      const offsetY = centerY - (minY + layoutHeight / 2);
+      const offsetX = (CONFIG.CANVAS_SIZE - layoutWidth) / 2 - minX;
+      const offsetY = (CONFIG.CANVAS_SIZE - layoutHeight) / 2 - minY;
       
       // Create final nodes with target positions
       nodes = packedNodes.map(node => ({
@@ -753,8 +471,8 @@
         // Don't apply force if animation is complete
         if (leftAnimationComplete) return;
         
-        const centerX = getResponsiveCenterX('left');
-        const centerY = getResponsiveCenterY('left');
+        const centerX = CONFIG.CENTER_X;
+        const centerY = CONFIG.CENTER_Y;
         const strength = 0.01; // Very weak force
         
         currentNodes.forEach(node => {
@@ -834,13 +552,11 @@
         return;
       }
 
-      // Add new node at responsive center with target packed position
-      const centerX = getResponsiveCenterX('left');
-      const centerY = getResponsiveCenterY('left');
+      // Add new node at center with target packed position
       const newNode = {
         ...nodes[currentNodes.length],
-        x: centerX, // start at responsive center
-        y: centerY, // start at responsive center
+        x: CONFIG.CENTER_X, // start at center
+        y: CONFIG.CENTER_Y, // start at center
         targetX: nodes[currentNodes.length].x, // packed position
         targetY: nodes[currentNodes.length].y, // packed position
         vx: 0,
@@ -955,84 +671,24 @@
 
     // === Text Display Functions ===
     function showLeftSideText() {
-      const centerX = getResponsiveCenterX('left');
-      const centerY = getResponsiveCenterY('left');
-      const scaleFactor = getResponsiveScaleFactor();
-      const fontSize = Math.max(16, 24 * scaleFactor);
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      
-      // Calculate text offset using responsive configuration
-      let textOffset;
-      if (isStackedLayout()) {
-        // For stacked layouts, use multiplier relative to center
-        textOffset = centerY + (centerY * config.textOffset);
-        // Apply stacked layout title offset
-        textOffset += getResponsiveLeftTitleYOffset();
-      } else {
-        // For dual/hybrid layouts, use percentage of canvas height
-        textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
-      }
-      
-      // Ensure text stays within canvas bounds
-      textOffset = Math.min(textOffset, currentCanvasDimensions.height - 20);
-      
-      console.log(`📝 Left text positioning:`, {
-        breakpoint: currentBreakpoint,
-        centerY: centerY,
-        canvasHeight: currentCanvasDimensions.height,
-        textOffset: textOffset,
-        fontSize: fontSize,
-        configTextOffset: config.textOffset
-      });
-      
       mainAnimationGroup.append("text")
-        .attr("x", centerX)
-        .attr("y", textOffset)
+        .attr("x", CONFIG.CENTER_X)
+        .attr("y", CONFIG.CENTER_Y + 320) // Moved down 30px (was 250)
         .attr("text-anchor", "middle")
         .attr("font-family", "Outfit, sans-serif")
-        .attr("font-size", `${fontSize}px`)
+        .attr("font-size", "24px")
         .attr("font-weight", "600")
         .attr("fill", CONFIG.STROKE_COLOR)
         .text("Traditional Node distribution");
     }
 
     function showRightSideText() {
-      const centerX = getResponsiveCenterX('right');
-      const centerY = getResponsiveCenterY('right');
-      const scaleFactor = getResponsiveScaleFactor();
-      const fontSize = Math.max(16, 24 * scaleFactor);
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      
-      // Calculate text offset using responsive configuration
-      let textOffset;
-      if (isStackedLayout()) {
-        // For stacked layouts, use multiplier relative to center
-        textOffset = centerY + (centerY * config.textOffset);
-        // Apply stacked layout title offset
-        textOffset += getResponsiveRightTitleYOffset();
-      } else {
-        // For dual/hybrid layouts, use percentage of canvas height
-        textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
-      }
-      
-      // Ensure text stays within canvas bounds
-      textOffset = Math.min(textOffset, currentCanvasDimensions.height - 20);
-      
-      console.log(`📝 Right text positioning:`, {
-        breakpoint: currentBreakpoint,
-        centerY: centerY,
-        canvasHeight: currentCanvasDimensions.height,
-        textOffset: textOffset,
-        fontSize: fontSize,
-        configTextOffset: config.textOffset
-      });
-      
       sixClusterGroup.append("text")
-        .attr("x", centerX)
-        .attr("y", textOffset)
+        .attr("x", CONFIG.RIGHT_SIDE_CENTER_X)
+        .attr("y", CONFIG.RIGHT_SIDE_CENTER_Y + 320) // Moved down 30px (was 250)
         .attr("text-anchor", "middle")
         .attr("font-family", "Outfit, sans-serif")
-        .attr("font-size", `${fontSize}px`)
+        .attr("font-size", "24px")
         .attr("font-weight", "600")
         .attr("fill", CONFIG.STROKE_COLOR)
         .text("Cerebral Node distribution");
@@ -1130,27 +786,20 @@
         // Fixed number of balls per cluster (all clusters same)
         const numBalls = CONFIG.BALLS_PER_CLUSTER;
         
-        // Get responsive configuration for cluster sizing
-        const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-        
-        // Create balls for this cluster with responsive size
+        // Create balls for this cluster with fixed size
         const clusterBalls = Array.from({ length: numBalls }, () => {
           return {
             id: ballId++,
             value: 1, // Fixed value for uniform size
             clusterId: i,
-            r: config.clusterBallSize // Responsive radius for all right-side balls
+            r: CONFIG.RIGHT_CLUSTER_BALL_SIZE // Fixed radius for all right-side balls
           };
         });
         
         // Calculate cluster center position (radial layout around right side center)
         const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
-        const rightCenterX = getResponsiveCenterX('right');
-        const rightCenterY = getResponsiveCenterY('right');
-        const scaleFactor = getResponsiveScaleFactor();
-        const clusterRadius = config.clusterRadius * scaleFactor;
-        const centerX = rightCenterX + Math.cos(angle) * clusterRadius;
-        const centerY = rightCenterY + Math.sin(angle) * clusterRadius;
+        const centerX = CONFIG.RIGHT_SIDE_CENTER_X + Math.cos(angle) * CONFIG.CLUSTER_RADIUS;
+        const centerY = CONFIG.RIGHT_SIDE_CENTER_Y + Math.sin(angle) * CONFIG.CLUSTER_RADIUS;
         
         clusters.push({
           id: i,
@@ -1164,15 +813,12 @@
     }
 
     // Generate six clusters
-    let sixClusters = createSixClusters();
+    const sixClusters = createSixClusters();
 
-    // Pack each cluster independently with responsive sizing
-    const scaleFactor = getResponsiveScaleFactor();
-    const packConfig = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+    // Pack each cluster independently with fixed ball sizes
     sixClusters.forEach(cluster => {
-      const packSize = packConfig.clusterPackSize * scaleFactor;
       const pack = d3.pack()
-        .size([packSize, packSize])
+        .size([CONFIG.CLUSTER_PACK_SIZE, CONFIG.CLUSTER_PACK_SIZE])
         .padding(2);
       
       const root = d3.hierarchy({ children: cluster.balls }).sum(d => d.value);
@@ -1181,8 +827,8 @@
       // Update cluster balls with packed positions (keep fixed radius)
       packedBalls.forEach((packedBall, i) => {
         const ball = cluster.balls[i];
-        ball.x = packedBall.x + cluster.centerX - packSize / 2;
-        ball.y = packedBall.y + cluster.centerY - packSize / 2;
+        ball.x = packedBall.x + cluster.centerX - CONFIG.CLUSTER_PACK_SIZE / 2;
+        ball.y = packedBall.y + cluster.centerY - CONFIG.CLUSTER_PACK_SIZE / 2;
         // Keep the fixed radius we set earlier
         // ball.r remains CONFIG.RIGHT_CLUSTER_BALL_SIZE
       });
@@ -1190,50 +836,6 @@
 
     // Create separate SVG group for six clusters to avoid conflicts
     const sixClusterGroup = svg.append("g").attr("id", "six-clusters");
-
-    // Function to update cluster positions when layout changes
-    function updateClusterPositions() {
-      // Safety check: only update if clusters exist
-      if (!sixClusters || sixClusters.length === 0) {
-        console.log(`⚠️ Skipping cluster position update - clusters not yet initialized`);
-        return;
-      }
-      
-      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-      const scaleFactor = getResponsiveScaleFactor();
-      
-      sixClusters.forEach((cluster, i) => {
-        // Recalculate cluster center position based on current responsive layout
-        const angle = (i * 2 * Math.PI) / CONFIG.NUM_CLUSTERS;
-        const rightCenterX = getResponsiveCenterX('right');
-        const rightCenterY = getResponsiveCenterY('right');
-        const clusterRadius = config.clusterRadius * scaleFactor;
-        
-        // Update cluster center position
-        cluster.centerX = rightCenterX + Math.cos(angle) * clusterRadius;
-        cluster.centerY = rightCenterY + Math.sin(angle) * clusterRadius;
-        
-        // Update individual ball positions within the cluster
-        const packSize = config.clusterPackSize * scaleFactor;
-        const pack = d3.pack()
-          .size([packSize, packSize])
-          .padding(2);
-        
-        const root = d3.hierarchy({ children: cluster.balls }).sum(d => d.value);
-        const packedBalls = pack(root).leaves();
-        
-        cluster.balls.forEach((ball, ballIndex) => {
-          const packedBall = packedBalls[ballIndex];
-          ball.x = packedBall.x + cluster.centerX - packSize / 2;
-          ball.y = packedBall.y + cluster.centerY - packSize / 2;
-        });
-        
-        console.log(`🔄 Updated cluster ${i} position: (${cluster.centerX.toFixed(1)}, ${cluster.centerY.toFixed(1)})`);
-      });
-      
-      // Update the visual cluster groups if they exist
-      updateClusterGroups();
-    }
 
     // Setup cluster groups and render circles (hidden initially)
     function setupClusterGroups() {
@@ -1276,61 +878,12 @@
       });
     }
 
-    // Function to update existing cluster groups when positions change
-    function updateClusterGroups() {
-      // Safety check: only update if clusters exist
-      if (!sixClusters || sixClusters.length === 0) {
-        console.log(`⚠️ Skipping cluster groups update - clusters not yet initialized`);
-        return;
-      }
-      
-      sixClusters.forEach(cluster => {
-        const clusterGroup = sixClusterGroup.select(`.cluster-${cluster.id}`);
-        
-        if (clusterGroup.empty()) return; // Skip if group doesn't exist yet
-        
-        // Update circle positions
-        clusterGroup.selectAll("circle")
-          .transition()
-          .duration(300)
-          .attr("cx", d => d.x)
-          .attr("cy", d => d.y);
-          
-        // Update intra-cluster line positions
-        if (CONFIG.ENABLE_LINES) {
-          const links = [];
-          for (let i = 0; i < cluster.balls.length; i++) {
-            for (let j = i + 1; j < cluster.balls.length; j++) {
-              links.push({ source: cluster.balls[i], target: cluster.balls[j] });
-            }
-          }
-          
-          clusterGroup.selectAll("line")
-            .data(links)
-            .transition()
-            .duration(300)
-            .attr("x1", d => d.source.x)
-            .attr("y1", d => d.source.y)
-            .attr("x2", d => d.target.x)
-            .attr("y2", d => d.target.y);
-        }
-      });
-    }
-
-    // Debug: Log cluster positions with responsive configuration
-    const debugConfig = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
-    console.log(`📊 Six clusters created for ${currentBreakpoint}:`, {
-      clusters: sixClusters.length,
-      ballsPerCluster: CONFIG.BALLS_PER_CLUSTER,
-      ballSize: debugConfig.clusterBallSize,
-      clusterRadius: debugConfig.clusterRadius,
-      packSize: debugConfig.clusterPackSize,
-      scaleFactor: scaleFactor.toFixed(2)
-    });
+    // Debug: Log cluster positions
+    console.log(`Six clusters created: ${sixClusters.length} clusters, ${CONFIG.BALLS_PER_CLUSTER} balls each, size: ${CONFIG.RIGHT_CLUSTER_BALL_SIZE}px`);
     sixClusters.forEach((cluster, i) => {
-      console.log(`Cluster ${i}: center (${cluster.centerX.toFixed(1)}, ${cluster.centerY.toFixed(1)}), balls: ${cluster.balls.length}`);
+      console.log(`Cluster ${i}: center (${cluster.centerX}, ${cluster.centerY}), balls: ${cluster.balls.length}`);
       if (cluster.balls.length > 0) {
-        console.log(`  First ball: x=${cluster.balls[0].x.toFixed(1)}, y=${cluster.balls[0].y.toFixed(1)}, r=${cluster.balls[0].r}`);
+        console.log(`  First ball: x=${cluster.balls[0].x}, y=${cluster.balls[0].y}, r=${cluster.balls[0].r}`);
       }
     });
 
