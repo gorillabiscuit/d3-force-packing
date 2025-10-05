@@ -27,7 +27,7 @@
       BALL_SIZE_MULTIPLIER: 1, // Multiplier for ball sizes (1.0 = original)
       
       // Animation timing
-      BALL_APPEAR_DELAY: 40, // ms between ball appearances
+      BALL_APPEAR_DELAY: 10, // ms between ball appearances
       FINAL_SETTLEMENT_TIME:8000, // ms for final settlement phase
       
       // Force simulation parameters (Mike Bostock balanced approach)
@@ -204,6 +204,9 @@
           layout: 'stacked', // Vertical stacking for mobile
           // Text positioning
           textOffset: 0.8, // Multiplier for text Y position relative to center
+          // Left-side animation sizing
+          leftBallSizeMultiplier: 0.6, // Multiplier for all left-side balls
+          leftLargeBallMultiplier: 1.8, // Multiplier for large balls vs small balls
           // Right-side cluster sizing
           clusterBallSize: 8, // Size of individual cluster balls
           clusterRadius: 80, // Distance from center for cluster centers
@@ -216,6 +219,9 @@
           layout: 'stacked',
           // Text positioning
           textOffset: 0.7,
+          // Left-side animation sizing
+          leftBallSizeMultiplier: 0.7,
+          leftLargeBallMultiplier: 1.8,
           // Right-side cluster sizing
           clusterBallSize: 10,
           clusterRadius: 100,
@@ -228,6 +234,9 @@
           layout: 'hybrid', // Hybrid layout for tablets
           // Text positioning
           textOffset: 0.25, // 25% of canvas height below center
+          // Left-side animation sizing
+          leftBallSizeMultiplier: 0.8,
+          leftLargeBallMultiplier: 1.8,
           // Right-side cluster sizing
           clusterBallSize: 12,
           clusterRadius: 140,
@@ -240,6 +249,9 @@
           layout: 'dual', // Side-by-side for laptops
           // Text positioning
           textOffset: 0.25, // 25% of canvas height below center
+          // Left-side animation sizing
+          leftBallSizeMultiplier: 0.9,
+          leftLargeBallMultiplier: 1.8,
           // Right-side cluster sizing
           clusterBallSize: 12,
           clusterRadius: 160,
@@ -252,9 +264,12 @@
           layout: 'dual',
           // Text positioning
           textOffset: 0.25, // 25% of canvas height below center
+          // Left-side animation sizing
+          leftBallSizeMultiplier: 1.0,
+          leftLargeBallMultiplier: 1.8,
           // Right-side cluster sizing
           clusterBallSize: 12,
-          clusterRadius: 180,
+          clusterRadius: 80,
           clusterPackSize: 120,
         },
         '2xl': { 
@@ -263,11 +278,14 @@
           padding: 80,
           layout: 'dual',
           // Text positioning
-          textOffset: 0.25, // 25% of canvas height below center
+          textOffset: 0.42, // 25% of canvas height below center
+          // Left-side animation sizing
+          leftBallSizeMultiplier: 1.1,
+          leftLargeBallMultiplier: 1.8,
           // Right-side cluster sizing
-          clusterBallSize: 14, // Slightly larger for 2xl screens
-          clusterRadius: 220, // Increased for larger screens
-          clusterPackSize: 130, // Increased for larger screens
+          clusterBallSize: 10, // Slightly larger for 2xl screens
+          clusterRadius: 180, // Increased for larger screens
+          clusterPackSize: 100, // Increased for larger screens
         }
       }
     };
@@ -503,6 +521,17 @@
       return currentLayoutParams.layout === 'dual';
     }
     
+    // Helper functions for responsive left-side animation sizing
+    function getResponsiveLeftBallSizeMultiplier() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.leftBallSizeMultiplier;
+    }
+    
+    function getResponsiveLeftLargeBallMultiplier() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.leftLargeBallMultiplier;
+    }
+    
     // Initialize responsive system after all responsive configs are defined
     setupResponsiveMonitoring();
 
@@ -518,15 +547,20 @@
        packedNodes = Array.from({ length: CONFIG.BALL_COUNT }, (_, i) => {
          const isLarge = shuffledIndices[i] < CONFIG.LARGE_BALL_COUNT;
         
-        // Variable radius within the size category
-        let radius;
+        // Variable radius within the size category with responsive multipliers
+        let baseRadius;
         if (isLarge) {
-          radius = CONFIG.LARGE_BALL_MIN_RADIUS + 
-                   Math.random() * (CONFIG.LARGE_BALL_MAX_RADIUS - CONFIG.LARGE_BALL_MIN_RADIUS);
+          baseRadius = CONFIG.LARGE_BALL_MIN_RADIUS + 
+                      Math.random() * (CONFIG.LARGE_BALL_MAX_RADIUS - CONFIG.LARGE_BALL_MIN_RADIUS);
         } else {
-          radius = CONFIG.SMALL_BALL_MIN_RADIUS + 
-                   Math.random() * (CONFIG.SMALL_BALL_MAX_RADIUS - CONFIG.SMALL_BALL_MIN_RADIUS);
+          baseRadius = CONFIG.SMALL_BALL_MIN_RADIUS + 
+                      Math.random() * (CONFIG.SMALL_BALL_MAX_RADIUS - CONFIG.SMALL_BALL_MIN_RADIUS);
         }
+        
+        // Apply responsive sizing multipliers
+        const sizeMultiplier = getResponsiveLeftBallSizeMultiplier();
+        const largeMultiplier = isLarge ? getResponsiveLeftLargeBallMultiplier() : 1;
+        const radius = baseRadius * sizeMultiplier * largeMultiplier;
         
         // Better initial positioning to avoid all starting at center
         const angle = Math.random() * 2 * Math.PI;
@@ -554,16 +588,20 @@
     const root = d3.hierarchy(data).sum(d => d.value);
       packedNodes = pack(root).leaves();
       
-      // Apply size multiplier and set radius based on mode
+      // Apply size multiplier and set radius based on mode with responsive multipliers
       packedNodes.forEach(node => {
         node.r *= CONFIG.BALL_SIZE_MULTIPLIER;
         
+        // Apply responsive sizing multiplier
+        const sizeMultiplier = getResponsiveLeftBallSizeMultiplier();
+        node.r *= sizeMultiplier;
+        
         if (CONFIG.USE_FIXED_SIZE) {
           // All balls same size
-          node.r = CONFIG.FIXED_BALL_RADIUS;
+          node.r = CONFIG.FIXED_BALL_RADIUS * sizeMultiplier;
         } else {
           // Variable sizes constrained to min/max bounds
-          node.r = Math.max(CONFIG.MIN_BALL_RADIUS, Math.min(CONFIG.MAX_BALL_RADIUS, node.r));
+          node.r = Math.max(CONFIG.MIN_BALL_RADIUS * sizeMultiplier, Math.min(CONFIG.MAX_BALL_RADIUS * sizeMultiplier, node.r));
         }
       });
     }
