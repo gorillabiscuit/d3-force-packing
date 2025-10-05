@@ -28,13 +28,13 @@
       
       // Animation timing
       BALL_APPEAR_DELAY: 10, // ms between ball appearances
-      FINAL_SETTLEMENT_TIME:12000, // ms for final settlement phase
+      FINAL_SETTLEMENT_TIME:6000, // ms for final settlement phase
       
       // Force simulation parameters (Mike Bostock balanced approach)
-      CHARGE_STRENGTH: -50, // Moderate repulsion between balls
+      CHARGE_STRENGTH: -80, // Moderate repulsion between balls
       PACK_FORCE_STRENGTH: 0.1, // Very weak pack force (reduced to prevent center crashing)
       COLLISION_PADDING: 8, // Strong collision padding for separation
-      ALPHA_DECAY: 0.005, // Very slow decay for gentle settling
+      ALPHA_DECAY: 0.05, // Very slow decay for gentle settling
       
       // Visual settings
       STROKE_WIDTH: 2,
@@ -202,6 +202,8 @@
           maxHeight: '60vh',
           padding: 20,
           layout: 'stacked', // Vertical stacking for mobile
+          // Animation center positioning
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
           textOffset: 0.8, // Multiplier for text Y position relative to center
           // Left-side animation sizing
@@ -217,44 +219,50 @@
           maxHeight: '70vh',
           padding: 30,
           layout: 'stacked',
+          // Animation center positioning
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
-          textOffset: 0.7,
+          textOffset: 0.9,
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.7,
           leftLargeBallMultiplier: 0.5,
           // Right-side cluster sizing
-          clusterBallSize: 10,
-          clusterRadius: 170,
-          clusterPackSize: 80,
+          clusterBallSize: 4,
+          clusterRadius: 200,
+          clusterPackSize: 100,
         },
         md: { 
           maxWidth: '95vw', 
           maxHeight: '75vh',
           padding: 40,
           layout: 'hybrid', // Hybrid layout for tablets
+          // Animation center positioning
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
           textOffset: 0.5, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.8,
           leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
-          clusterBallSize: 8,
+          clusterBallSize: 7,
           clusterRadius: 180,
-          clusterPackSize: 100,
+          clusterPackSize: 120,
         },
         lg: { 
           maxWidth: '90vw', 
           maxHeight: '80vh',
           padding: 50,
           layout: 'dual', // Side-by-side for laptops
+          // Animation center positioning
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
-          textOffset: 0.45, // 25% of canvas height below center
+          textOffset: 0.43, // 25% of canvas height below center
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.7,
           leftLargeBallMultiplier: 0.8,
           // Right-side cluster sizing
           clusterBallSize: 8,
-          clusterRadius: 160,
+          clusterRadius: 180,
           clusterPackSize: 110,
         },
         xl: { 
@@ -262,6 +270,8 @@
           maxHeight: '85vh',
           padding: 60,
           layout: 'dual',
+          // Animation center positioning
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
           textOffset: 0.42, // 25% of canvas height below center
           // Left-side animation sizing
@@ -269,7 +279,7 @@
           leftLargeBallMultiplier: 0.7,
           // Right-side cluster sizing
           clusterBallSize: 8,
-          clusterRadius: 140,
+          clusterRadius: 180,
           clusterPackSize: 100,
         },
         '2xl': { 
@@ -277,6 +287,8 @@
           maxHeight: '90vh',
           padding: 80,
           layout: 'dual',
+          // Animation center positioning
+          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
           // Text positioning
           textOffset: 0.42, // 25% of canvas height below center
           // Left-side animation sizing
@@ -498,7 +510,9 @@
     }
     
     function getResponsiveCenterY(side = 'left') {
-      return side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
+      const baseY = side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
+      const offset = getResponsiveCenterYOffset();
+      return baseY + offset;
     }
     
     function getResponsiveScaleFactor() {
@@ -530,6 +544,12 @@
     function getResponsiveLeftLargeBallMultiplier() {
       const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
       return config.leftLargeBallMultiplier;
+    }
+    
+    // Helper function for responsive center Y offset
+    function getResponsiveCenterYOffset() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.centerYOffset || 0;
     }
     
     // Initialize responsive system after all responsive configs are defined
