@@ -204,6 +204,11 @@
           layout: 'stacked', // Vertical stacking for mobile
           // Animation center positioning
           centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
+          // Stacked layout positioning (only applies when layout = 'stacked')
+          leftAnimationYOffset: 0, // Y offset for left animation in stacked layout
+          rightAnimationYOffset: 0, // Y offset for right animation in stacked layout
+          leftTitleYOffset: 0, // Y offset for left title in stacked layout
+          rightTitleYOffset: 0, // Y offset for right title in stacked layout
           // Text positioning
           textOffset: 0.8, // Multiplier for text Y position relative to center
           // Left-side animation sizing
@@ -220,9 +225,14 @@
           padding: 30,
           layout: 'stacked',
           // Animation center positioning
-          centerYOffset: 0, // Y offset for animation centerpoints (positive = down, negative = up)
+          centerYOffset: -10, // Y offset for animation centerpoints (positive = down, negative = up)
+          // Stacked layout positioning (only applies when layout = 'stacked')
+          leftAnimationYOffset: 0, // Y offset for left animation in stacked layout
+          rightAnimationYOffset: 0, // Y offset for right animation in stacked layout
+          leftTitleYOffset: 0, // Y offset for left title in stacked layout
+          rightTitleYOffset: 0, // Y offset for right title in stacked layout
           // Text positioning
-          textOffset: 0.9,
+          textOffset: 0.4,
           // Left-side animation sizing
           leftBallSizeMultiplier: 0.7,
           leftLargeBallMultiplier: 0.5,
@@ -512,6 +522,13 @@
     function getResponsiveCenterY(side = 'left') {
       const baseY = side === 'left' ? currentLayoutParams.leftCenter.y : currentLayoutParams.rightCenter.y;
       const offset = getResponsiveCenterYOffset();
+      
+      // Apply stacked layout specific offsets if in stacked layout
+      if (isStackedLayout()) {
+        const stackedOffset = side === 'left' ? getResponsiveLeftAnimationYOffset() : getResponsiveRightAnimationYOffset();
+        return baseY + offset + stackedOffset;
+      }
+      
       return baseY + offset;
     }
     
@@ -550,6 +567,27 @@
     function getResponsiveCenterYOffset() {
       const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
       return config.centerYOffset || 0;
+    }
+    
+    // Helper functions for stacked layout positioning
+    function getResponsiveLeftAnimationYOffset() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.leftAnimationYOffset || 0;
+    }
+    
+    function getResponsiveRightAnimationYOffset() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.rightAnimationYOffset || 0;
+    }
+    
+    function getResponsiveLeftTitleYOffset() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.leftTitleYOffset || 0;
+    }
+    
+    function getResponsiveRightTitleYOffset() {
+      const config = RESPONSIVE_CONFIG.breakpoints[currentBreakpoint];
+      return config.rightTitleYOffset || 0;
     }
     
     // Initialize responsive system after all responsive configs are defined
@@ -916,6 +954,8 @@
       if (isStackedLayout()) {
         // For stacked layouts, use multiplier relative to center
         textOffset = centerY + (centerY * config.textOffset);
+        // Apply stacked layout title offset
+        textOffset += getResponsiveLeftTitleYOffset();
       } else {
         // For dual/hybrid layouts, use percentage of canvas height
         textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
@@ -956,6 +996,8 @@
       if (isStackedLayout()) {
         // For stacked layouts, use multiplier relative to center
         textOffset = centerY + (centerY * config.textOffset);
+        // Apply stacked layout title offset
+        textOffset += getResponsiveRightTitleYOffset();
       } else {
         // For dual/hybrid layouts, use percentage of canvas height
         textOffset = centerY + (currentCanvasDimensions.height * config.textOffset);
