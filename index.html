@@ -764,11 +764,13 @@
         return;
       }
 
-      // Add new node at center with target packed position
+      // Add new node at responsive center with target packed position
+      const centerX = getResponsiveCenterX('left');
+      const centerY = getResponsiveCenterY('left');
       const newNode = {
         ...nodes[currentNodes.length],
-        x: CONFIG.CENTER_X, // start at center
-        y: CONFIG.CENTER_Y, // start at center
+        x: centerX, // start at responsive center
+        y: centerY, // start at responsive center
         targetX: nodes[currentNodes.length].x, // packed position
         targetY: nodes[currentNodes.length].y, // packed position
         vx: 0,
